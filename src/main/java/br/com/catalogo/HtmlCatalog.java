@@ -15,7 +15,7 @@ final class HtmlCatalog {
  Map<String,Object> catalog()throws Exception{
   var books=new ArrayList<Map<String,Object>>();var marks=new LinkedHashMap<String,Object>();for(var b:lib.books()){
    var row=new LinkedHashMap<String,Object>();row.put("id",b.id);row.put("documentTitle",b.title);row.put("filename",b.filename);row.put("name",b.filename.replaceFirst("\\.[^.]+$",""));row.put("path",b.path);row.put("topic",b.section.split("/")[0]);row.put("section",b.section);row.put("format",b.format);row.put("size",Files.exists(lib.file(b))?Files.size(lib.file(b)):0);row.put("url",encode("Livros/"+b.path));row.put("metadata",Biblioteca.JSON.readTree(b.metadata));books.add(row);
-   if(b.updated>0){var mark=new LinkedHashMap<String,Object>();mark.put("favorite",b.favorite);mark.put("reading",b.reading);mark.put("page",b.page);mark.put("location",b.location);mark.put("notes",b.notes);mark.put("updated",b.updated);marks.put(b.path,mark);}
+   if(b.updated>0){var mark=new LinkedHashMap<String,Object>();mark.put("favorite",b.favorite);mark.put("reading",b.reading);mark.put("page",b.page);mark.put("location",b.format.equalsIgnoreCase("PDF")?"":b.location);mark.put("notes",b.notes);mark.put("updated",b.updated);marks.put(b.path,mark);}
   }
   var categories=new ArrayList<Map<String,String>>();for(String path:lib.categories())categories.add(Map.of("path",path,"name",Path.of(path).getFileName().toString().replace('_',' '),"parent",path.contains("/")?path.substring(0,path.lastIndexOf('/')):""));
   return Map.of("books",books,"marks",marks,"categories",categories,"database",lib.root.resolve("catalogo.sqlite").toString());
@@ -28,6 +28,6 @@ final class HtmlCatalog {
   for(String key:List.of("favorite","reading"))if(patch.has(key)&&!patch.get(key).isBoolean())throw new IllegalArgumentException("Marcação inválida");
   if(patch.has("favorite"))b.favorite=patch.path("favorite").asBoolean();if(patch.has("reading"))b.reading=patch.path("reading").asBoolean();
   if(patch.hasNonNull("page")){if(!patch.get("page").isIntegralNumber()||patch.path("page").asInt()<1||patch.path("page").asLong()>1000000)throw new IllegalArgumentException("Página inválida");b.page=patch.path("page").asInt();}
-  if(patch.has("notes")){if(!patch.get("notes").isTextual()||patch.path("notes").asText().length()>200000)throw new IllegalArgumentException("Anotação inválida");b.notes=patch.path("notes").asText();}if(patch.has("location")){if(!patch.get("location").isTextual()||patch.path("location").asText().length()>500)throw new IllegalArgumentException("Local inválido");b.location=patch.path("location").asText();}lib.save(b);
+  if(patch.has("notes")){if(!patch.get("notes").isTextual()||patch.path("notes").asText().length()>200000)throw new IllegalArgumentException("Anotação inválida");b.notes=patch.path("notes").asText();}if(patch.has("location")&&!b.format.equalsIgnoreCase("PDF")){if(!patch.get("location").isTextual()||patch.path("location").asText().length()>500)throw new IllegalArgumentException("Local inválido");b.location=patch.path("location").asText();}lib.save(b);
  }
 }

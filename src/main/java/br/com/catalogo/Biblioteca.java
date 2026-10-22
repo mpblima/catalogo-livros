@@ -56,6 +56,11 @@ public final class Biblioteca {
   if(page<1)throw new IllegalArgumentException("Página inválida");
   writeChanges(b,new LinkedHashMap<>(Map.of("page",page,"reading",1)));b.page=page;b.reading=true;
  }
+ public void saveProgress(Book b,int page,String location)throws SQLException {
+  if(page<1)throw new IllegalArgumentException("Página inválida");
+  var changes=new LinkedHashMap<String,Object>();changes.put("page",page);changes.put("reading",1);changes.put("location",Objects.toString(location,""));
+  writeChanges(b,changes);b.page=page;b.reading=true;b.location=Objects.toString(location,"");
+ }
  private void writeChanges(Book b,LinkedHashMap<String,Object> changes)throws SQLException {
   try(var c=connect()){
    c.setAutoCommit(false);
