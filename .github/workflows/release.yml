@@ -1,0 +1,53 @@
+name: Testes e releases
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: catalogo-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Dependências de compilação e OCR
+        run: sudo apt-get update && sudo apt-get install -y libtesseract5 libleptonica-dev libgomp1 tesseract-ocr-eng tesseract-ocr-por xvfb fakeroot
+      - name: Preparar OCR incluído
+        run: packaging/preparar_ocr.sh
+      - name: Testes Java, Swing e persistência
+        run: xvfb-run -a mvn -B -Dcatalogo.guiTest=true verify
+      - name: Validar OCR
+        run: java -jar target/catalogo-livros.jar --verify-ocr
+      - name: Gerar instaladores
+        if: github.event_name != 'pull_request'
+        run: ./empacotar_java.sh "2.0.${{ github.run_number }}"
+      - name: Validar instalador independente do código-fonte
+        if: github.event_name != 'pull_request'
+        run: |
+          dist/*.run --prefix "$RUNNER_TEMP/catalogo_teste" --no-integrate
+          mvn -B -Dtest=InstallationIntegrationTest -Dcatalogo.binary="$RUNNER_TEMP/catalogo_teste/catalogo" test
+      - name: Guardar relatórios dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testes-java
+          path: target/surefire-reports/
+      - name: Publicar release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: 2.0.${{ github.run_number }}
+        run: |
+          gh release create "v${VERSION}" dist/* --target "$GITHUB_SHA" --title "Catálogo de Livros ${VERSION}" --generate-notes

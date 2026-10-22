@@ -1,0 +1,10 @@
+package br.com.catalogo;
+import org.junit.jupiter.api.*;import org.junit.jupiter.api.io.TempDir;import static org.junit.jupiter.api.Assertions.*;import java.nio.file.*;import java.net.*;import java.net.http.*;
+class HttpServerTest {
+ @TempDir Path temp;
+ @Test void authenticatesPersistsMarksExportsHtmlAndServesPdfRanges()throws Exception{
+  var lib=new Biblioteca(temp.resolve("Livros"));OrganizerTest.pdf(lib.root.resolve("Teste.pdf"),"Kotlin Essentials");new LibraryOrganizer(lib).organize((p,m)->{});var b=lib.books().get(0);var client=HttpClient.newHttpClient();try(var server=new CatalogHttpServer(lib,0,"test-token")){String base="http://127.0.0.1:"+server.port();var denied=client.send(HttpRequest.newBuilder(URI.create(base+"/api/catalog")).build(),HttpResponse.BodyHandlers.ofString());assertEquals(403,denied.statusCode());var cat=client.send(HttpRequest.newBuilder(URI.create(base+"/api/catalog")).header("X-Catalogo-Token","test-token").build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,cat.statusCode());assertTrue(cat.body().contains("Kotlin Essentials"));String patch=Biblioteca.JSON.writeValueAsString(java.util.Map.of("path",b.path,"patch",java.util.Map.of("notes","Nota pela API","reading",true,"page",2)));var saved=client.send(HttpRequest.newBuilder(URI.create(base+"/api/marks")).header("X-Catalogo-Token","test-token").POST(HttpRequest.BodyPublishers.ofString(patch)).build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,saved.statusCode(),saved.body());assertEquals("Nota pela API",lib.books().get(0).notes);assertEquals(2,lib.books().get(0).page);
+  var range=client.send(HttpRequest.newBuilder(URI.create(base+"/Livros/Teste.pdf")).header("Range","bytes=0-7").build(),HttpResponse.BodyHandlers.ofByteArray());assertEquals(206,range.statusCode());assertEquals(8,range.body().length);assertTrue(new String(range.body()).startsWith("%PDF"));var html=client.send(HttpRequest.newBuilder(URI.create(base+"/")).build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,html.statusCode());assertFalse(html.body().contains("__CATALOG_DATA__"));assertTrue(html.body().contains("Kotlin Essentials"));
+  }
+ }
+}

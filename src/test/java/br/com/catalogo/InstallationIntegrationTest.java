@@ -1,0 +1,8 @@
+package br.com.catalogo;
+import org.junit.jupiter.api.*;import org.junit.jupiter.api.condition.EnabledIfSystemProperty;import org.junit.jupiter.api.io.TempDir;import static org.junit.jupiter.api.Assertions.*;import java.nio.file.*;import java.util.*;import java.util.concurrent.TimeUnit;
+@EnabledIfSystemProperty(named="catalogo.binary",matches=".+")
+class InstallationIntegrationTest {
+ @TempDir Path temp;
+ String run(String... args)throws Exception{var cmd=new ArrayList<String>();cmd.add(System.getProperty("catalogo.binary"));cmd.addAll(List.of(args));var pb=new ProcessBuilder(cmd).directory(temp.toFile()).redirectErrorStream(true);pb.environment().put("PATH","/nonexistent");var p=pb.start();var output=new java.util.concurrent.CompletableFuture<String>();Thread reader=new Thread(()->{try{output.complete(new String(p.getInputStream().readAllBytes()));}catch(Exception e){output.completeExceptionally(e);}});reader.start();assertTrue(p.waitFor(90,TimeUnit.SECONDS),"Processo não terminou");String text=output.get();assertEquals(0,p.exitValue(),text);return text;}
+ @Test void installedBinaryOrganizesWithoutSourceFolderOrPython()throws Exception{Path root=temp.resolve("Livros");OrganizerTest.pdf(root.resolve("Novo arquivo.pdf"),"Kotlin Essentials");String text=run("--update","--library",root.toString());assertTrue(text.contains("\"moved\":1"),text);var lib=new Biblioteca(root);assertEquals(1,lib.books().size());assertEquals("Kotlin Essentials",lib.books().get(0).title);assertTrue(lib.books().get(0).path.contains("kotlin"));assertTrue(run("--verify-ocr").contains("OCR incluído: OK"));}
+}
