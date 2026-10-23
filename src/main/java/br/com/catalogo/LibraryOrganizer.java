@@ -43,10 +43,16 @@ final class LibraryOrganizer {
    var result=new LinkedHashMap<String,Object>();result.put("moved",moved);result.put("duplicates",duplicates);result.put("files",changes);result.put("skipped",skipped);result.put("total",lib.books().size());result.put("relations",relations);result.put("unclassified",lib.books().stream().filter(b->b.section.equals("a_classificar")).count());return result;
   }
  });}
- private List<Path> paths()throws IOException{var result=new ArrayList<Path>();Files.walkFileTree(lib.root,new SimpleFileVisitor<>(){
+ private List<Path> paths()throws IOException{var result=new ArrayList<Path>();Files.walkFileTree(lib.root,documentVisitor(result));result.sort(Comparator.naturalOrder());return result;}
+ SimpleFileVisitor<Path> documentVisitor(List<Path> result){return new SimpleFileVisitor<>(){
   public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attrs){String n=dir.getFileName().toString();return !dir.equals(lib.root)&&(n.equals("organizacao")||n.startsWith(".")||n.contains("wso2is_analytics"))?FileVisitResult.SKIP_SUBTREE:FileVisitResult.CONTINUE;}
   public FileVisitResult visitFile(Path file,BasicFileAttributes attrs){if(attrs.isRegularFile()&&extension(file)&&DocumentExtractor.recognizable(file))result.add(file);return FileVisitResult.CONTINUE;}
- });result.sort(Comparator.naturalOrder());return result;}
+  public FileVisitResult visitFileFailed(Path file,IOException error)throws IOException{
+   // SQLite sidecars may disappear between directory listing and attribute lookup.
+   if(error instanceof NoSuchFileException)return FileVisitResult.CONTINUE;
+   throw error;
+  }
+ };}
  @SuppressWarnings("unchecked") private Map<String,Map<String,Object>> cache()throws IOException{Path p=lib.root.resolve("organizacao/titulos_documentos.json");return Files.exists(p)?Biblioteca.JSON.readValue(Files.readString(p),LinkedHashMap.class):new LinkedHashMap<>();}
  private void saveCache(Map<String,Map<String,Object>> cache)throws Exception{Path dir=lib.root.resolve("organizacao");Files.createDirectories(dir);Path tmp=Files.createTempFile(dir,"titulos_",".tmp");Files.writeString(tmp,Biblioteca.JSON.writerWithDefaultPrettyPrinter().writeValueAsString(cache));Files.move(tmp,dir.resolve("titulos_documentos.json"),StandardCopyOption.REPLACE_EXISTING);}
  private void indexOne(Path file,DocumentExtractor.Result extracted,Map<String,Map<String,Object>> cache,DocumentExtractor extractor)throws Exception{

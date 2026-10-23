@@ -5,6 +5,15 @@ import org.apache.pdfbox.pdmodel.*;import org.apache.pdfbox.pdmodel.font.*;
 class OrganizerTest {
  @TempDir Path temp;
  static void pdf(Path path,String title)throws Exception{Files.createDirectories(path.getParent());try(var doc=new PDDocument()){var page=new PDPage();doc.addPage(page);doc.getDocumentInformation().setTitle(title);doc.getDocumentInformation().setAuthor("Autora Exemplo");try(var cs=new PDPageContentStream(doc,page)){cs.beginText();cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),22);cs.newLineAtOffset(50,700);cs.showText(title);cs.newLineAtOffset(0,-50);cs.showText("Published by Manning Publications, Copyright 2025");cs.endText();}doc.save(path.toFile());}}
+ @Test void disappearingSqliteSidecarsDoNotAbortDocumentScan()throws Exception{
+  var lib=new Biblioteca(temp.resolve("Livros"));var organizer=new LibraryOrganizer(lib);
+  Path book=lib.root.resolve("programacao/kotlin.pdf");pdf(book,"Kotlin Essentials");
+  var found=new ArrayList<Path>();var visitor=organizer.documentVisitor(found);
+  Path wal=lib.root.resolve("catalogo.sqlite-wal");
+  assertEquals(FileVisitResult.CONTINUE,visitor.visitFileFailed(wal,new NoSuchFileException(wal.toString())));
+  Files.walkFileTree(lib.root,visitor);assertEquals(List.of(book),found);
+  assertThrows(AccessDeniedException.class,()->visitor.visitFileFailed(book,new AccessDeniedException(book.toString())));
+ }
  @Test void organizesIndexesAndIsIdempotentWhilePreservingMarksAndAliases()throws Exception{
   var lib=new Biblioteca(temp.resolve("Livros"));Path loose=lib.root.resolve("Nome Esquisito.pdf");pdf(loose,"Kotlin Essentials");var organizer=new LibraryOrganizer(lib);var result=organizer.organize((p,m)->{});assertEquals(1,result.get("moved"));var b=lib.books().get(0);assertEquals("Kotlin Essentials",b.title);assertTrue(b.path.contains("kotlin"));assertTrue(b.filename.equals("kotlin_essentials.pdf"));assertEquals("Manning Publications",b.meta("publisher"));assertEquals(Set.of(b.id),lib.searchIds("mann ess"));b.notes="Nota preservada";b.favorite=true;b.page=8;lib.save(b);
   assertEquals(b.id,new HtmlCatalog(lib).resolve("Nome Esquisito.pdf").id);String hash=LibraryOrganizer.sha256(lib.file(b));result=organizer.organize((p,m)->{});assertEquals(0,result.get("moved"));var after=lib.books().get(0);assertEquals(b.id,after.id);assertEquals("Nota preservada",after.notes);assertEquals(8,after.page);assertTrue(after.favorite);assertEquals(hash,LibraryOrganizer.sha256(lib.file(after)));assertEquals(Set.of(b.id),lib.searchIds("preserv"));assertTrue(Files.exists(temp.resolve("catalogo_livros.html")));

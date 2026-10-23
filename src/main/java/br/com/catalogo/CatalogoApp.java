@@ -70,7 +70,8 @@ public final class CatalogoApp extends JFrame {
   var horizontal=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,sidebar,vertical);horizontal.setResizeWeight(.16);horizontal.setDividerLocation(255);horizontal.setBorder(BorderFactory.createEmptyBorder());horizontal.setDividerSize(20);main.add(horizontal);
   var footer=UiTheme.panel(new BorderLayout(14,0));status.setForeground(UiTheme.MUTED);status.setFont(status.getFont().deriveFont(12f));footer.add(status);progress.setPreferredSize(new Dimension(270,18));progress.setStringPainted(true);progress.setVisible(false);footer.add(progress,BorderLayout.EAST);main.add(footer,BorderLayout.SOUTH);
   search.getDocument().addDocumentListener(listener(this::filter));shelf.addActionListener(e->filter());
-  tree.addTreeSelectionListener(e->{Object n=tree.getLastSelectedPathComponent();if(n instanceof DefaultMutableTreeNode node){category=node.getUserObject() instanceof Category c?c.path:"";filter();}});
+  tree.addTreeSelectionListener(e->{if(!loading)browseCategory(tree.getSelectionPath());});
+  tree.addMouseListener(new MouseAdapter(){public void mouseClicked(MouseEvent e){if(SwingUtilities.isLeftMouseButton(e))browseCategory(tree.getPathForLocation(e.getX(),e.getY()));}});
   table.getSelectionModel().addListSelectionListener(e->{if(!e.getValueIsAdjusting()&&!loading)choose();});
   table.addMouseListener(new MouseAdapter(){public void mouseClicked(MouseEvent e){if(!SwingUtilities.isLeftMouseButton(e))return;int row=table.rowAtPoint(e.getPoint()),col=table.columnAtPoint(e.getPoint());if(row<0||col<0)return;if(table.convertColumnIndexToModel(col)==1){if(e.getClickCount()==1)openGroupFolder(visibleGroups.get(table.convertRowIndexToModel(row)));}else if(e.getClickCount()==2)open();}});
   table.addMouseMotionListener(new MouseMotionAdapter(){public void mouseMoved(MouseEvent e){int col=table.columnAtPoint(e.getPoint());table.setCursor(Cursor.getPredefinedCursor(col>=0&&table.rowAtPoint(e.getPoint())>=0&&table.convertColumnIndexToModel(col)==1?Cursor.HAND_CURSOR:Cursor.DEFAULT_CURSOR));}});
@@ -84,6 +85,13 @@ public final class CatalogoApp extends JFrame {
  static JPanel metric(String label,JLabel value){var panel=UiTheme.panel(new BorderLayout(0,5));value.setFont(value.getFont().deriveFont(Font.BOLD,23));panel.add(value,BorderLayout.NORTH);panel.add(UiTheme.eyebrow(label));return panel;}
  static DocumentListener listener(Runnable run){return new DocumentListener(){public void insertUpdate(DocumentEvent e){run.run();}public void removeUpdate(DocumentEvent e){run.run();}public void changedUpdate(DocumentEvent e){run.run();}};}
  record Category(String path){public String toString(){String[] p=path.split("/");return p[p.length-1].replace('_',' ');}}
+ void browseCategory(TreePath path){
+  if(loading||path==null)return;
+  var node=(DefaultMutableTreeNode)path.getLastPathComponent();
+  category=node.getUserObject() instanceof Category c?c.path:"";
+  loading=true;try{shelf.setSelectedIndex(0);search.setText("");}finally{loading=false;}
+  filter();
+ }
  void reload(){filter();}
  void filter(){if(loading||closed)return;searchSerial++;searchDelay.restart();}
  void runSearch(){

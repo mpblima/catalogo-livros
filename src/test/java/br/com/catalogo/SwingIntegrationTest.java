@@ -25,6 +25,23 @@ class SwingIntegrationTest {
  void edt(Action action)throws Exception{var error=new AtomicReference<Throwable>();SwingUtilities.invokeAndWait(()->{try{action.run();}catch(Throwable e){error.set(e);}});if(error.get()!=null)throw new AssertionError(error.get());}
  void await(BooleanSupplier condition)throws Exception{long until=System.currentTimeMillis()+10000;while(System.currentTimeMillis()<until){boolean[] pass={false};edt(()->pass[0]=condition.getAsBoolean());if(pass[0])return;Thread.sleep(30);}fail("Tempo excedido; erros: "+errors);}
  void settled()throws Exception{await(()->app.appliedSerial==app.searchSerial&&!app.searchDelay.isRunning());}
+ javax.swing.tree.TreePath categoryPath(String category){
+  var root=(javax.swing.tree.DefaultMutableTreeNode)app.tree.getModel().getRoot();var nodes=root.depthFirstEnumeration();
+  while(nodes.hasMoreElements()){var node=(javax.swing.tree.DefaultMutableTreeNode)nodes.nextElement();if(node.getUserObject() instanceof CatalogoApp.Category c&&c.path().equals(category))return new javax.swing.tree.TreePath(node.getPath());}
+  throw new AssertionError("Categoria ausente: "+category);
+ }
+ @Test void selectingCategoryShowsItsBooksAndClearsPreviousFilters()throws Exception{
+  try(var c=lib.connect();var s=c.createStatement()){
+   s.execute("INSERT INTO books VALUES('id2','cloud/azure/azure.pdf','Azure Essentials','azure.pdf','cloud/azure','PDF','{}',1)");
+   s.execute("INSERT INTO categories VALUES('cloud'),('cloud/azure'),('programacao')");
+  }
+  edt(()->{app.shelf.setSelectedIndex(1);app.search.setText("inexistente");});settled();
+  edt(()->app.tree.setSelectionPath(categoryPath("programacao")));settled();
+  edt(()->{assertEquals(0,app.shelf.getSelectedIndex());assertEquals("",app.search.getText());assertEquals(1,app.visible.size());assertEquals("id1",app.visible.get(0).id);});
+  edt(()->app.tree.setSelectionPath(categoryPath("cloud/azure")));settled();
+  edt(()->{assertEquals(1,app.visible.size());assertEquals("id2",app.visible.get(0).id);});
+  edt(()->app.tree.setSelectionRow(0));settled();edt(()->assertEquals(2,app.visible.size()));assertTrue(errors.isEmpty());
+ }
  @Test void searchesWithoutBlockingAndOpensFolder()throws Exception{
   edt(()->{assertEquals("Livro",app.model.getColumnName(0));assertEquals("Programação Java",app.model.getValueAt(0,0));Path[] opened={null};app.openFolder=p->opened[0]=p;app.table.moveColumn(1,0);var cell=app.table.getCellRect(0,0,true);app.table.dispatchEvent(new java.awt.event.MouseEvent(app.table,java.awt.event.MouseEvent.MOUSE_CLICKED,System.currentTimeMillis(),0,cell.x+10,cell.y+10,1,false,java.awt.event.MouseEvent.BUTTON1));assertEquals(pdf.getParent(),opened[0]);app.table.moveColumn(0,1);app.category="nenhuma";app.shelf.setSelectedIndex(2);app.search.setText("prog jav");});settled();edt(()->assertEquals(1,app.model.getRowCount()));
   // Segurar uma escrita força a busca a esperar pelo SQLite; a thread da interface continua livre.
