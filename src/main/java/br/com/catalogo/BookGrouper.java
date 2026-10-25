@@ -6,7 +6,7 @@ final class BookGrouper {
  static String compact(String s){return CategoryClassifier.fold(s).replaceAll("[^a-z0-9]","");}
  @SuppressWarnings("unchecked") static int refresh(Biblioteca lib)throws Exception {
   lib.relations();try(var c=lib.connect()){
-   var books=new ArrayList<Entry>();try(var s=c.createStatement();var r=s.executeQuery("SELECT id,path,title,size,sha256,metadata_json FROM books WHERE active=1")){while(r.next())books.add(new Entry(r.getString(1),r.getString(2),r.getString(3),r.getLong(4),r.getString(5),Biblioteca.JSON.readValue(r.getString(6),Map.class)));}
+   var books=new ArrayList<Entry>();try(var s=c.createStatement();var r=s.executeQuery("SELECT id,path,title,size,sha256,metadata_json FROM books WHERE active=1 AND section NOT LIKE 'livros_fisicos%'")){while(r.next())books.add(new Entry(r.getString(1),r.getString(2),r.getString(3),r.getLong(4),r.getString(5),Biblioteca.JSON.readValue(r.getString(6),Map.class)));}
    var byPath=new HashMap<String,Entry>();var byId=new HashMap<String,Entry>();for(var b:books){byPath.put(b.path,b);byId.put(b.id,b);}try(var s=c.createStatement();var r=s.executeQuery("SELECT path,book_id FROM path_aliases")){while(r.next()){var b=byId.get(r.getString(2));if(b!=null)byPath.putIfAbsent(r.getString(1),b);}}
    c.setAutoCommit(false);try{
     try(var s=c.createStatement()){s.executeUpdate("DELETE FROM book_relations WHERE source IN ('isbn_e_titulo','sha256')");}

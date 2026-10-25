@@ -23,7 +23,12 @@ Também são distribuídos um `.deb` para instalação no sistema e um `.tar.gz`
 - **Abrir e continuar:** PDF em janela independente, redimensionável e maximizável, com ajuste à largura e página salva automaticamente. EPUB abre no leitor padrão; o campo de localização registra onde continuar.
 - **Favorito / Em leitura:** mantém as escolhas no SQLite. A tela permite retomar as leituras.
 - **Anotações:** salvamento automático; alterações de outra janela são protegidas contra sobrescrita silenciosa.
-- **Organizar e atualizar:** procura documentos soltos na raiz de Livros, extrai título e metadados, cria categorias automaticamente, renomeia em snake_case e move para o assunto correspondente. Atualiza agrupamentos, SQLite, índice e HTML, com barra de progresso. Também ocorre em segundo plano ao iniciar.
+- **Acervos:** a árvore tem as categorias principais Livros digitais e Livros físicos. O acervo existente e seus assuntos ficam em Livros digitais; Livros físicos recebe os cadastros manuais ou por código de barras. Essa hierarquia é mantida no banco, preservando os caminhos dos arquivos e as marcações. A catalogação automática atua somente no acervo digital.
+- **Novo livro físico:** formulário com código de barras opcional e foco inicial para leitores USB/Bluetooth em modo teclado. Um ISBN válido inicia a consulta automática (Enter também funciona); Open Library e, como alternativa, Google Books fornecem os dados disponíveis e os links de capa. O livro é salvo numa categoria física criada pelo classificador, a confirmação aparece e o formulário limpa e retorna ao código. A tela agrupa os dados em duas colunas, com capa e localização na lateral e aba de resumo/anotações. Sem consulta disponível, é possível cadastrar manualmente, inclusive capa, resumo, localização, anotações e estado de leitura. ISBN/código repetido não cria outro registro físico. A busca geral encontra os dois acervos. A consulta requer internet; cadastro manual e pesquisa local funcionam sem ela.
+- **Capas, informações e resumos em segundo plano:** o cadastro enfileira a busca da imagem e o preenchimento dos dados bibliográficos e do resumo ausentes sem bloquear os próximos livros. A fila fica no SQLite, permite uma pesquisa por vez por biblioteca, usa Google Books (incluindo Dynamic Links), Open Library e fontes alternativas por ISBN e agenda novas tentativas após falhas. Reabre com a aplicação ou continua no serviço local. Capas existentes são preservadas; a prévia atualiza sozinha quando a imagem chega. Definir capa permite selecionar uma imagem manualmente. O diálogo de cadastro tem Fechar, inclusive durante a consulta de metadados.
+- **Excluir cadastro:** exige confirmação para o livro selecionado e remove suas marcações, prévia e buscas pendentes. Para digitais, mantém o arquivo no disco e registra a exclusão para que o próximo catálogo não o adicione novamente no mesmo caminho.
+- **Catalogar livros digitais:** procura documentos soltos na raiz de Livros, extrai título e metadados, cria categorias automaticamente, renomeia em snake_case e move para o assunto correspondente. Atualiza agrupamentos, SQLite, índice e HTML, com barra de progresso. Também ocorre em segundo plano ao iniciar.
+- **Capa e apresentação:** ao selecionar um livro, exibe uma miniatura da primeira página do PDF ou da capa declarada do EPUB, com a descrição do documento ao lado. Na ausência de descrição, o PDF mostra o texto inicial, sem prefixo. Capas e textos ficam no SQLite; a catalogação automática e o botão Catalogar livros digitais preenchem apenas os dados ausentes, preservando os existentes. Documentos sem capa ou texto disponíveis são indicados na interface.
 
 Arquivos sem identificação suficiente vão para `a_classificar`. PDFs inválidos são informados e mantidos. Cópias byte a byte idênticas são separadas em `organizacao/duplicados` para revisão; versões diferentes, EPUBs e amostras são preservados. IDs, aliases de caminhos e diário de operações mantêm a continuidade das marcações. Movimentações verificam SHA-256 e revertem o arquivo se a transação do banco falhar. Livros em outras pastas, incluindo material original do MBA, não são varridos automaticamente.
 
@@ -67,3 +72,36 @@ A branch principal é `master`. Todo push/merge nela executa testes Java e Swing
 ## Componentes de terceiros
 
 PDFBox (Apache 2.0), Jackson (Apache 2.0), SQLite JDBC (Apache 2.0), FlatLaf (Apache 2.0), JNA (Apache 2.0/LGPL), OpenJDK (GPLv2 com Classpath Exception), [Tesseract](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE) e [modelos de idioma](https://github.com/tesseract-ocr/tessdata_fast/blob/main/LICENSE) (Apache 2.0), [Leptonica](https://github.com/DanBloomberg/leptonica/blob/master/leptonica-license.txt) (BSD) e GNU OpenMP (GPLv3 com GCC Runtime Library Exception). Os avisos do OCR acompanham os recursos e os avisos Java são mantidos nos artefatos.
+
+### Edição e cadastro físico
+
+Use **Editar informações…** no livro selecionado para revisar os dados bibliográficos,
+resumo, capa, anotações e progresso. Metadados adicionais ficam disponíveis na aba
+**Outros metadados (JSON)**. Alterações são gravadas no catálogo; os arquivos digitais
+não são reescritos. Categorias digitais acompanham a organização dos arquivos; **Alterar categoria**
+permite personalizá-las na árvore, movendo e conferindo o arquivo.
+Todos os novos livros recebem classificação automática. Nos físicos, a categoria
+é sugerida após a consulta por ISBN e calculada também no cadastro manual. Você
+pode substituir a sugestão na árvore; a escolha vale só para aquele livro.
+Para livros físicos, personalize a categoria na árvore; **Nova categoria / subcategoria…**
+cria um nível dentro do nó selecionado, persistido ao salvar o livro.
+
+A leitura do ISBN preenche o formulário sem gravar. **Salvar alterações** é a
+única ação que cadastra ou atualiza o livro físico. Após salvar, o formulário
+permanece no mesmo livro; salvar novamente atualiza esse cadastro.
+**Cadastrar novo livro** limpa os campos e descarta alterações pendentes, sem
+gravação, inclusive cancelando uma consulta em andamento. Não há cadastro
+automático. Anotações e progresso dos físicos na tela principal também exigem
+**Salvar alterações**.
+A consulta por ISBN busca automaticamente os dados e a capa, tentando fontes
+alternativas quando necessário, incluindo páginas de livrarias com o ISBN da
+edição confirmado. Durante a consulta, uma barra animada mostra a etapa em
+andamento até concluir a busca da capa. **Trocar capa…** permite substituir uma capa que
+não agrade. A busca manual no Google e **Colar URL da capa…** ficam como último
+recurso, quando nenhuma capa é encontrada ou você decide trocá-la. A imagem é
+baixada e armazenada no SQLite ao salvar.
+
+O pipeline gera instaladores Linux (`.run`, `.deb` e arquivo portátil), Windows
+(`.msi`, x64) e macOS (`.dmg`, ARM64), com Java incluído. A publicação aguarda os
+três jobs. Windows e macOS ainda precisam de validação dos instaladores nesses
+sistemas; o OCR nativo incluído atualmente é específico do Linux x64.

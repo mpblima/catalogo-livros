@@ -11,7 +11,7 @@ class BibliotecaTest {
   try(var c=DriverManager.getConnection("jdbc:sqlite:"+root.resolve("catalogo.sqlite"));var s=c.createStatement()){
    s.execute("CREATE TABLE books(id TEXT PRIMARY KEY,path TEXT,title TEXT,filename TEXT,section TEXT,format TEXT,metadata_json TEXT,active INTEGER)");
    s.execute("CREATE TABLE marks(book_id TEXT PRIMARY KEY REFERENCES books(id),favorite INTEGER,reading INTEGER,page INTEGER,location TEXT,notes TEXT,updated INTEGER)");
-   s.execute("CREATE TABLE categories(path TEXT)");s.execute("INSERT INTO categories VALUES('programacao/java')");
+   s.execute("CREATE TABLE categories(path TEXT PRIMARY KEY,name TEXT,parent TEXT)");s.execute("INSERT INTO categories VALUES('programacao/java','Java','programacao')");
    s.execute("INSERT INTO books VALUES('id1','programacao/java/livro.pdf','Programação Java','livro.pdf','programacao/java','PDF','{\"author\":\"Ana\",\"publisher\":\"Editora Exemplo\",\"isbn\":\"9781234567890\"}',1)");
   }library=new Biblioteca(root);
  }

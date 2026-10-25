@@ -23,7 +23,7 @@ class SearchIndexTest {
   assertTrue(reopened.searchIds("violao").isEmpty());try(var c=library.connect();var s=c.createStatement();var r=s.executeQuery("SELECT count(*) FROM search_documents")){assertTrue(r.next());assertEquals(0,r.getInt(1));}
  }
  @Test void searchesCustomCategoryLabelsAndUsesFtsIndex()throws Exception {
-  try(var c=library.connect();var s=c.createStatement()){s.execute("ALTER TABLE categories ADD COLUMN name TEXT");s.execute("UPDATE categories SET name='Linguagens e integração'");}
+  try(var c=library.connect();var s=c.createStatement()){s.execute("UPDATE categories SET name='Linguagens e integração'");}
   assertEquals(java.util.Set.of("id1"),library.searchIds("lingu integra"));
   try(var c=library.connect();var s=c.createStatement();var r=s.executeQuery("EXPLAIN QUERY PLAN SELECT rowid FROM search_fts WHERE search_fts MATCH '\"integra\"'")){boolean fts=false;while(r.next())fts|=r.getString("detail").contains("VIRTUAL TABLE INDEX");assertTrue(fts);}
  }

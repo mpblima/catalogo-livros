@@ -14,6 +14,7 @@ public final class Biblioteca {
   this.root=root.toAbsolutePath().normalize();
   Files.createDirectories(this.root);
   initializeSchema();
+  try(var c=connect()){LibraryCategories.initialize(c);}
   try(var c=connect();var s=c.createStatement()){s.execute("PRAGMA journal_mode=WAL");}
   SearchIndex.initialize(this);
  }
@@ -21,6 +22,10 @@ public final class Biblioteca {
   try(var c=connect();var s=c.createStatement()){
    s.execute("CREATE TABLE IF NOT EXISTS books(id TEXT PRIMARY KEY,path TEXT UNIQUE NOT NULL,title TEXT,filename TEXT NOT NULL,topic TEXT NOT NULL,section TEXT NOT NULL,format TEXT NOT NULL,size INTEGER NOT NULL,mtime_ns INTEGER NOT NULL,sha256 TEXT,metadata_json TEXT NOT NULL DEFAULT '{}',title_source TEXT,active INTEGER NOT NULL DEFAULT 1,updated INTEGER NOT NULL)");
    s.execute("CREATE TABLE IF NOT EXISTS marks(book_id TEXT PRIMARY KEY REFERENCES books(id),favorite INTEGER NOT NULL DEFAULT 0,reading INTEGER NOT NULL DEFAULT 0,page INTEGER,location TEXT NOT NULL DEFAULT '',notes TEXT NOT NULL DEFAULT '',updated INTEGER NOT NULL)");
+   s.execute("CREATE TABLE IF NOT EXISTS physical_books(book_id TEXT PRIMARY KEY REFERENCES books(id),barcode TEXT UNIQUE,isbn TEXT UNIQUE)");
+   s.execute("CREATE TABLE IF NOT EXISTS book_previews(book_id TEXT PRIMARY KEY REFERENCES books(id),cover_png BLOB,summary TEXT)");
+   s.execute("CREATE TABLE IF NOT EXISTS cover_jobs(book_id TEXT PRIMARY KEY REFERENCES books(id),attempts INTEGER NOT NULL DEFAULT 0,next_attempt INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '')");
+   s.execute("CREATE TABLE IF NOT EXISTS excluded_documents(path TEXT PRIMARY KEY)");
    s.execute("CREATE TABLE IF NOT EXISTS categories(path TEXT PRIMARY KEY,name TEXT NOT NULL,parent TEXT NOT NULL DEFAULT '')");
    s.execute("CREATE TABLE IF NOT EXISTS path_aliases(path TEXT PRIMARY KEY,book_id TEXT NOT NULL REFERENCES books(id))");
    s.execute("CREATE TABLE IF NOT EXISTS operations(id INTEGER PRIMARY KEY,operation TEXT,source TEXT,destination TEXT,sha256 TEXT,created INTEGER,detail TEXT)");
@@ -35,6 +40,7 @@ public final class Biblioteca {
   final Map<String,Object> original=new HashMap<>();
   Map<String,Object> fields(){var m=new LinkedHashMap<String,Object>();m.put("favorite",favorite?1:0);m.put("reading",reading?1:0);m.put("page",page);m.put("location",location);m.put("notes",notes);return m;}
   void remember(){original.clear();original.putAll(fields());}
+  public boolean physical(){return LibraryCategories.physical(section);}
   public String display(){return (title==null||title.isBlank()?"Título não identificado":title)+" ("+filename+")";}
   public String searchable(){return normalize(display()+" "+path+" "+section+" "+metadata+" "+notes);}
   public String meta(String name){try{return JSON.readTree(metadata).path(name).asText("");}catch(Exception e){return "";}}
@@ -63,18 +69,19 @@ public final class Biblioteca {
  }
  private void writeChanges(Book b,LinkedHashMap<String,Object> changes)throws SQLException {
   try(var c=connect()){
-   c.setAutoCommit(false);
-   try {
-    try(var insert=c.prepareStatement("INSERT INTO marks(book_id,favorite,reading,page,location,notes,updated) VALUES(?,0,0,1,'','',0) ON CONFLICT(book_id) DO NOTHING")){insert.setString(1,b.id);insert.executeUpdate();}
-    var sql=new StringBuilder("UPDATE marks SET ");sql.append(String.join(",",changes.keySet().stream().map(k->k+"=?").toList()));sql.append(",updated=? WHERE book_id=?");
-    for(String k:List.of("notes","location"))if(changes.containsKey(k))sql.append(" AND (COALESCE("+k+",'') IS ? OR COALESCE("+k+",'') IS ?)");
-    try(var update=c.prepareStatement(sql.toString())){
-     int i=1;for(Object value:changes.values())update.setObject(i++,value);long stamp=System.currentTimeMillis();update.setLong(i++,stamp);update.setString(i++,b.id);
-     for(String k:List.of("notes","location"))if(changes.containsKey(k)){update.setObject(i++,b.original.getOrDefault(k,""));update.setObject(i++,changes.get(k));}
-     if(update.executeUpdate()!=1)throw new SQLException("Este texto foi alterado em outra janela. Sua edição foi preservada. Copie o texto antes de recarregar o catálogo.");
-     c.commit();b.updated=stamp;changes.forEach(b.original::put);
-    }
-   }catch(SQLException e){c.rollback();throw e;}
+   c.setAutoCommit(false);try{long stamp=writeChanges(c,b,changes);c.commit();b.updated=stamp;changes.forEach(b.original::put);}catch(SQLException e){c.rollback();throw e;}
+  }
+ }
+ // Compartilhado com o editor: a transação pertence ao chamador, sem alterar o snapshot antes do commit.
+ static long writeChanges(Connection c,Book b,LinkedHashMap<String,Object> changes)throws SQLException {
+  try(var insert=c.prepareStatement("INSERT INTO marks(book_id,favorite,reading,page,location,notes,updated) VALUES(?,0,0,1,'','',0) ON CONFLICT(book_id) DO NOTHING")){insert.setString(1,b.id);insert.executeUpdate();}
+  var sql=new StringBuilder("UPDATE marks SET ");sql.append(String.join(",",changes.keySet().stream().map(k->k+"=?").toList()));sql.append(",updated=? WHERE book_id=?");
+  for(String k:List.of("notes","location"))if(changes.containsKey(k))sql.append(" AND (COALESCE("+k+",'') IS ? OR COALESCE("+k+",'') IS ?)");
+  try(var update=c.prepareStatement(sql.toString())){
+   int i=1;for(Object value:changes.values())update.setObject(i++,value);long stamp=System.currentTimeMillis();update.setLong(i++,stamp);update.setString(i++,b.id);
+   for(String k:List.of("notes","location"))if(changes.containsKey(k)){update.setObject(i++,b.original.getOrDefault(k,""));update.setObject(i++,changes.get(k));}
+   if(update.executeUpdate()!=1)throw new SQLException("Este texto foi alterado em outra janela. Sua edição foi preservada. Copie o texto antes de recarregar o catálogo.");
+   return stamp;
   }
  }
  public List<WorkGroups.Relation> relations()throws SQLException {
@@ -83,6 +90,23 @@ public final class Biblioteca {
    try(var r=s.executeQuery("SELECT book_id,related_book_id,kind FROM book_relations")){while(r.next())list.add(new WorkGroups.Relation(r.getString(1),r.getString(2),r.getString(3)));}
   }return list;
  }
+ /** Exclui o cadastro e suas dependências; nunca remove arquivos do disco. */
+ public void deleteBook(String id)throws SQLException{
+  relations();
+  try(var c=connect();var s=c.createStatement()){
+   s.execute("BEGIN IMMEDIATE");try{
+    String path,section;try(var q=c.prepareStatement("SELECT path,section FROM books WHERE id=?")){q.setString(1,id);try(var r=q.executeQuery()){if(!r.next())throw new SQLException("Livro não encontrado.");path=r.getString(1);section=r.getString(2);}}
+    if(!LibraryCategories.physical(section))try(var q=c.prepareStatement("INSERT OR IGNORE INTO excluded_documents(path) VALUES(?)")){q.setString(1,path);q.executeUpdate();}
+    for(String table:List.of("cover_jobs","physical_books","book_previews","marks","path_aliases"))try(var q=c.prepareStatement("DELETE FROM "+table+" WHERE book_id=?")){q.setString(1,id);q.executeUpdate();}
+    try(var q=c.prepareStatement("DELETE FROM book_relations WHERE book_id=? OR related_book_id=?")){q.setString(1,id);q.setString(2,id);q.executeUpdate();}
+    try(var q=c.prepareStatement("DELETE FROM search_documents WHERE book_id=?")){q.setString(1,id);q.executeUpdate();}
+    try(var q=c.prepareStatement("DELETE FROM books WHERE id=?")){q.setString(1,id);q.executeUpdate();}
+    try(var q=c.prepareStatement("DELETE FROM search_dirty WHERE book_id=?")){q.setString(1,id);q.executeUpdate();}
+    s.execute("COMMIT");
+   }catch(SQLException e){s.execute("ROLLBACK");throw e;}
+  }
+ }
+ boolean excluded(String path)throws SQLException{try(var c=connect();var q=c.prepareStatement("SELECT 1 FROM excluded_documents WHERE path=?")){q.setString(1,path);try(var r=q.executeQuery()){return r.next();}}}
  public Path file(Book b) {var p=root.resolve(b.path).normalize();if(!p.startsWith(root))throw new IllegalArgumentException("Caminho inválido");return p;}
  public List<String> categories() throws Exception {try(var c=connect();var s=c.createStatement();var r=s.executeQuery("SELECT path FROM categories ORDER BY path")){var a=new ArrayList<String>();while(r.next())a.add(r.getString(1));return a;}}
  public static boolean matches(Book b,String query){String haystack=b.searchable();for(String term:SearchIndex.terms(query))if(!haystack.contains(term))return false;return true;}
