@@ -1,0 +1,50 @@
+name: Publicar página do projeto
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - 'scripts/build_pages.py'
+      - 'scripts/test_build_pages.py'
+      - '.github/workflows/pages.yml'
+  release:
+    types: [published, edited, released, deleted]
+  workflow_run:
+    workflows: ['Testes e releases']
+    types: [completed]
+    branches: [master]
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: master
+      - name: Validar agregação das releases
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Gerar página com downloads atualizados
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/build_pages.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment

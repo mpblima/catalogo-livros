@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mpblima.github.io/catalogo-livros/sitemap.xml

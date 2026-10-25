@@ -9,3 +9,5 @@ __pycache__/
 .env
 /src/main/resources/catalogo/ocr/native/
 /src/main/resources/catalogo/ocr/tessdata/
+
+/_site/

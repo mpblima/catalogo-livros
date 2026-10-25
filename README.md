@@ -105,3 +105,16 @@ O pipeline gera instaladores Linux (`.run`, `.deb` e arquivo portátil), Windows
 (`.msi`, x64) e macOS (`.dmg`, ARM64), com Java incluído. A publicação aguarda os
 três jobs. Windows e macOS ainda precisam de validação dos instaladores nesses
 sistemas; o OCR nativo incluído atualmente é específico do Linux x64.
+
+## Página do projeto
+
+A página de apresentação e downloads fica em https://mpblima.github.io/catalogo-livros/.
+O site está em `docs/`, com layout responsivo e sem dependências de frontend.
+`python3 scripts/build_pages.py` gera `_site/` consultando as releases com o GitHub
+CLI autenticado. O contador soma downloads dos instaladores e pacotes portáteis
+nas releases estáveis; checksums, drafts e pré-releases ficam de fora. Cada
+plataforma aponta para a versão estável mais recente que contém seu instalador.
+
+O workflow `pages.yml` publica o site em alterações da página, conclusão da release,
+eventos de release, execução manual e a cada seis horas para atualizar contadores.
+Nenhum token de acesso é incluído nos arquivos publicados.

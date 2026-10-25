@@ -4,6 +4,13 @@ on:
     branches: [master]
   push:
     branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - 'scripts/build_pages.py'
+      - 'scripts/test_build_pages.py'
+      - '.github/workflows/pages.yml'
+      - 'README.md'
+      - '.gitignore'
   workflow_dispatch:
 permissions:
   contents: read
