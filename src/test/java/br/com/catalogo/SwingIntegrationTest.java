@@ -68,7 +68,7 @@ class SwingIntegrationTest {
   edt(()->{app.bookSplit.setDividerLocation(app.bookSplit.getMaximumDividerLocation());app.validate();assertInstanceOf(JScrollPane.class,app.bookSplit.getBottomComponent());var scroll=(JScrollPane)app.bookSplit.getBottomComponent();var viewport=scroll.getViewport();var view=viewport.getView();assertTrue(scroll.getVerticalScrollBar().isVisible());assertTrue(view.getHeight()>viewport.getExtentSize().height);assertEquals(viewport.getExtentSize().width,view.getWidth());assertFalse(scroll.getHorizontalScrollBar().isVisible());scroll.getVerticalScrollBar().setValue(scroll.getVerticalScrollBar().getMaximum());app.validate();assertTrue(viewport.getViewPosition().y>0);assertTrue(viewport.getViewPosition().y+viewport.getExtentSize().height>=view.getHeight()-2,"Rodapé dos detalhes deve ficar acessível");});assertTrue(errors.isEmpty());
  }
  @Test void selectedBookLoadsPreviewAndMissingFileClearsIt()throws Exception{
-  await(()->app.cover.getIcon()!=null);edt(()->assertFalse(app.summary.getText().contains("Trecho inicial:")));
+  await(()->app.cover.getIcon()!=null);edt(()->{assertFalse(app.summary.getText().contains("Trecho inicial:"));assertTrue(app.subtitle.isVisible());assertEquals("Arquivo: "+lib.file(app.selected).toAbsolutePath().normalize(),app.subtitle.getText());assertFalse(app.subtitle.isEditable());});
   edt(()->{var missing=new Biblioteca.Book();missing.path="missing.pdf";app.loadPreview(missing);});
   await(()->app.cover.getText().equals("Capa indisponível"));edt(()->assertNull(app.cover.getIcon()));
  }
