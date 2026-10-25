@@ -9,9 +9,11 @@ import com.fasterxml.jackson.databind.*;
 /** Persistência nativa JDBC. Mantém IDs e o esquema da biblioteca anterior. */
 public final class Biblioteca {
  public final Path root;
+ public final Path database;
  public static final ObjectMapper JSON = new ObjectMapper();
- public Biblioteca(Path root) throws Exception {
-  this.root=root.toAbsolutePath().normalize();
+ public Biblioteca(Path root) throws Exception {this(root,"catalogo.sqlite");}
+ public Biblioteca(Path root,String databaseName) throws Exception {
+  var profile=new LibrarySettings.Profile(root,databaseName);this.root=profile.directory();this.database=profile.file();
   Files.createDirectories(this.root);
   initializeSchema();
   try(var c=connect()){LibraryCategories.initialize(c);}
@@ -31,7 +33,7 @@ public final class Biblioteca {
    s.execute("CREATE TABLE IF NOT EXISTS operations(id INTEGER PRIMARY KEY,operation TEXT,source TEXT,destination TEXT,sha256 TEXT,created INTEGER,detail TEXT)");
   }
  }
- Connection connect() throws SQLException {var c=DriverManager.getConnection("jdbc:sqlite:"+root.resolve("catalogo.sqlite"));try(var s=c.createStatement()){s.execute("PRAGMA busy_timeout=30000");s.execute("PRAGMA foreign_keys=ON");}return c;}
+ Connection connect() throws SQLException {var c=DriverManager.getConnection("jdbc:sqlite:"+database);try(var s=c.createStatement()){s.execute("PRAGMA busy_timeout=30000");s.execute("PRAGMA foreign_keys=ON");}return c;}
  public static String normalize(String s){return SearchIndex.normalize(s);}
  public Set<String> searchIds(String query)throws SQLException{return SearchIndex.search(this,query);}
  public void refreshSearchIndex()throws SQLException{SearchIndex.refresh(this);}

@@ -118,3 +118,24 @@ plataforma aponta para a versão estável mais recente que contém seu instalado
 O workflow `pages.yml` publica o site em alterações da página, conclusão da release,
 eventos de release, execução manual e a cada seis horas para atualizar contadores.
 Nenhum token de acesso é incluído nos arquivos publicados.
+
+
+## Bibliotecas e bancos independentes
+
+Na primeira abertura de uma instalação limpa, escolha o diretório dos livros
+digitais e o nome do arquivo SQLite (`.sqlite`, `.sqlite3` ou `.db`). Use
+**Escolher banco existente…** para reabrir uma biblioteca após reinstalar. Se o
+arquivo não existir, o aplicativo cria a pasta, o banco e a estrutura do catálogo.
+O banco fica dentro do diretório escolhido para a biblioteca.
+
+O botão **Biblioteca / banco…** permite alternar entre pastas e bancos, inclusive
+entre bancos diferentes na mesma pasta. As escolhas ficam no histórico e a última
+biblioteca é restaurada ao abrir. O serviço HTML acompanha a seleção. A biblioteca
+antiga em `~/Desktop/Livros/catalogo.sqlite` é reconhecida automaticamente, sem
+mover seus arquivos. Mantenha livros e banco juntos no backup.
+
+Também é possível abrir uma combinação específica sem alterar a seleção salva:
+
+```bash
+~/Apps/Catalogo/catalogo --library /caminho/dos/livros --database minha-biblioteca.sqlite
+```

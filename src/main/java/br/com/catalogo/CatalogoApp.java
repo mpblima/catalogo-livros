@@ -15,6 +15,8 @@ import java.util.List;
 /** Catálogo desktop Swing: não usa navegador nem servidor para a interface. */
 public final class CatalogoApp extends JFrame {
  final Biblioteca library;
+ CoverQueue ownedCoverQueue;
+ final JButton switchLibrary=new JButton("Biblioteca / banco…");
  List<Biblioteca.Book> all=new ArrayList<>(),visible=new ArrayList<>();
  Biblioteca.Book selected;
  List<WorkGroups.Group> visibleGroups=new ArrayList<>();
@@ -56,7 +58,7 @@ public final class CatalogoApp extends JFrame {
  String category="";boolean loading=false,busy=false;String lastSaved="";
  public CatalogoApp(Biblioteca lib)throws Exception {this(lib,true);}
  CatalogoApp(Biblioteca lib,boolean automaticStartup)throws Exception {
-  super("Catálogo de Livros");library=lib;
+  super("Catálogo de Livros");library=lib;setTitle("Catálogo de Livros · "+lib.root+" · "+lib.database.getFileName());
   setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);setMinimumSize(new Dimension(1050,700));setSize(1480,960);setLocationRelativeTo(null);setIconImage(UiTheme.appIcon());
   autoSave=new javax.swing.Timer(650,e->save());autoSave.setRepeats(false);
   searchDelay=new javax.swing.Timer(180,e->runSearch());searchDelay.setRepeats(false);
@@ -65,7 +67,7 @@ public final class CatalogoApp extends JFrame {
   var identity=UiTheme.panel(new BorderLayout(16,0));identity.add(new JLabel(new UiTheme.BookIcon(54)),BorderLayout.WEST);var brandText=UiTheme.panel(new BorderLayout(0,3));brandText.add(UiTheme.eyebrow("SEU ACERVO PESSOAL"),BorderLayout.NORTH);var brand=new JLabel("Biblioteca");brand.setFont(new Font("Serif",Font.BOLD,34));brandText.add(brand);identity.add(brandText);hero.add(identity,BorderLayout.WEST);
   var metrics=UiTheme.panel(new FlowLayout(FlowLayout.RIGHT,28,4));metrics.add(metric("LIVROS",collectionStat));metrics.add(metric("EM LEITURA",readingStat));metrics.add(metric("FAVORITOS",favoriteStat));hero.add(metrics,BorderLayout.EAST);header.add(hero,BorderLayout.NORTH);
   search.putClientProperty("JTextField.placeholderText","Pesquisar por título, autor, editora ou assunto…");search.setPreferredSize(new Dimension(400,46));search.setToolTipText("Pesquise palavras ou partes de palavras em todo o acervo");
-  var commandBar=UiTheme.panel(new BorderLayout(16,0));commandBar.add(search);var actions=UiTheme.panel(new FlowLayout(FlowLayout.RIGHT,10,0));UiTheme.primary(update);var arbitrary=new JButton("Abrir arquivo…");actions.add(arbitrary);actions.add(newPhysical);actions.add(update);commandBar.add(actions,BorderLayout.EAST);header.add(commandBar,BorderLayout.SOUTH);main.add(header,BorderLayout.NORTH);
+  var commandBar=UiTheme.panel(new BorderLayout(16,0));commandBar.add(search);var actions=UiTheme.panel(new FlowLayout(FlowLayout.RIGHT,10,0));UiTheme.primary(update);var arbitrary=new JButton("Abrir arquivo…");actions.add(switchLibrary);switchLibrary.setToolTipText(library.root+" · "+library.database.getFileName());switchLibrary.addActionListener(e->chooseLibrary());actions.add(arbitrary);actions.add(newPhysical);actions.add(update);commandBar.add(actions,BorderLayout.EAST);header.add(commandBar,BorderLayout.SOUTH);main.add(header,BorderLayout.NORTH);
   var sidebar=new JPanel(new BorderLayout(0,18));sidebar.setBorder(UiTheme.card());sidebar.setPreferredSize(new Dimension(235,400));
   var navigation=UiTheme.panel(new BorderLayout(0,10));navigation.add(UiTheme.eyebrow("EXPLORAR"),BorderLayout.NORTH);navigation.add(shelf);sidebar.add(navigation,BorderLayout.NORTH);tree.setRootVisible(true);tree.setBorder(BorderFactory.createEmptyBorder(4,0,4,0));sidebar.add(UiTheme.scroll(tree));
   table.setRowHeight(48);table.setIntercellSpacing(new Dimension(0,0));table.getTableHeader().setPreferredSize(new Dimension(0,40));table.setFillsViewportHeight(true);table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);table.setAutoCreateRowSorter(true);table.setShowGrid(false);table.getColumnModel().getColumn(0).setPreferredWidth(480);table.getColumnModel().getColumn(1).setPreferredWidth(280);table.getColumnModel().getColumn(2).setPreferredWidth(145);table.getColumnModel().getColumn(3).setPreferredWidth(240);
@@ -181,7 +183,7 @@ public final class CatalogoApp extends JFrame {
   };previewWorker.execute();
  }
  void pollCover(){if(!closed&&isShowing()&&selected!=null&&selected.physical()&&(previewWorker==null||previewWorker.isDone()))loadPreview(selected,false);}
- @Override public void dispose(){coverRefresh.stop();super.dispose();}
+ @Override public void dispose(){coverRefresh.stop();if(ownedCoverQueue!=null)ownedCoverQueue.close();super.dispose();}
  boolean confirmDeletion(Biblioteca.Book book){return JOptionPane.showConfirmDialog(this,"Excluir o cadastro de "+book.title+"?\nAs marcações deste cadastro serão removidas."+(book.physical()?"":"\nO arquivo digital será preservado e ignorado nas próximas catalogagens."),"Excluir cadastro",JOptionPane.YES_NO_OPTION,JOptionPane.WARNING_MESSAGE)==JOptionPane.YES_OPTION;}
  void deleteSelected(){
   if(selected==null||!selected.physical()||busy||!save())return;var book=selected;if(!confirmDelete.test(book))return;
@@ -217,21 +219,27 @@ public final class CatalogoApp extends JFrame {
    protected void done(){try{String result=get();if(closed)return;if(!finishCatalogUpdate())return;progress.setValue(100);status.setText("Catálogo e índice atualizados");var j=Biblioteca.JSON.readTree(result);if(showSummary&&j.has("result")){var r=j.path("result");JOptionPane.showMessageDialog(CatalogoApp.this,"Movidos: "+r.path("moved").asInt()+"\nDuplicados separados para revisão: "+r.path("duplicates").asInt()+"\nA classificar: "+r.path("unclassified").asInt(),"Atualização concluída",JOptionPane.INFORMATION_MESSAGE);}}catch(Exception e){error(e);}finally{busy=false;update.setEnabled(true);move.setEnabled(selected!=null&&!selected.physical());deleteButton.setEnabled(selected!=null&&selected.physical());setCover.setEnabled(selected!=null&&selected.physical());progress.setVisible(false);}}
   }.execute();
  }
+ void chooseLibrary(){if(busy)return;try{var profile=LibraryPicker.choose(this,new LibrarySettings.Profile(library.root,library.database.getFileName().toString()));if(profile!=null)switchTo(profile);}catch(Exception e){error(e);}}
+ void switchTo(LibrarySettings.Profile profile){
+  if(busy||closed||profile.file().equals(library.database)||!save())return;busy=true;switchLibrary.setEnabled(false);status.setText("Abrindo biblioteca: "+profile.directory()+" · "+profile.database());
+  new SwingWorker<Biblioteca,Void>(){protected Biblioteca doInBackground()throws Exception{var next=profile.open();LibrarySettings.activate(profile);return next;}protected void done(){try{var next=new CatalogoApp(get());next.ownedCoverQueue=CoverQueue.start(next.library);next.onReady=()->{next.setVisible(true);closed=true;searchDelay.stop();autoSave.stop();if(searchWorker!=null)searchWorker.cancel(false);dispose();};next.reportError=e->{next.setVisible(true);next.showError(e);};}catch(Exception e){busy=false;switchLibrary.setEnabled(true);error(e);}}}.execute();
+ }
  void error(Exception e){reportError.accept(e);}
  void showError(Exception e){JOptionPane.showMessageDialog(this,Objects.toString(e.getMessage(),e.toString()),"Não foi possível concluir",JOptionPane.ERROR_MESSAGE);}
  public static void main(String[] args)throws Exception {
-  Path requested=Path.of(System.getProperty("catalogo.root",System.getProperty("user.home")+"/Desktop/Livros"));for(int i=0;i<args.length-1;i++)if(args[i].equals("--library"))requested=Path.of(args[i+1]);final Path root=requested;
-  if(Arrays.asList(args).contains("--serve")){var library=new Biblioteca(root);var queue=CoverQueue.start(library);var config=HtmlCatalog.configuration();var server=new CatalogHttpServer(library,config.port(),config.token());Runtime.getRuntime().addShutdownHook(new Thread(()->{server.close();queue.close();}));new java.util.concurrent.CountDownLatch(1).await();return;}
-  if(Arrays.asList(args).contains("--update")){var library=new Biblioteca(root);System.out.println(Biblioteca.JSON.writeValueAsString(new LibraryOrganizer(library).organize((p,m)->System.err.println(p+"% "+m))));return;}
+  var explicit=LibrarySettings.explicit(args);var active=explicit!=null?explicit:LibrarySettings.read().active();
+  if(Arrays.asList(args).contains("--serve")){var server=new LibraryServer(HtmlCatalog.configuration());Runtime.getRuntime().addShutdownHook(new Thread(server::close));while(true){try{server.select(explicit!=null?explicit:LibrarySettings.read().active());}catch(Exception e){System.err.println("Biblioteca do serviço: "+e.getMessage());}Thread.sleep(1000);}}
+  if(Arrays.asList(args).contains("--update")){var library=(active!=null?active:LibrarySettings.legacy()).open();System.out.println(Biblioteca.JSON.writeValueAsString(new LibraryOrganizer(library).organize((p,m)->System.err.println(p+"% "+m))));return;}
   if(Arrays.asList(args).contains("--verify-ocr")){var image=new java.awt.image.BufferedImage(1200,250,java.awt.image.BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();g.setColor(Color.WHITE);g.fillRect(0,0,1200,250);g.setColor(Color.BLACK);g.setFont(new Font("SansSerif",Font.BOLD,64));g.drawString("Kotlin Essentials",60,140);g.dispose();try(var ocr=new NativeOcr()){String text=String.join(" ",ocr.lines(image).stream().map(DocumentExtractor.Line::text).toList());if(!text.toLowerCase().contains("kotlin"))throw new IllegalStateException("OCR não reconheceu o texto de teste");System.out.println("OCR incluído: OK (eng+por)");}return;}
   UiTheme.install();
-  if(Arrays.asList(args).contains("--verify")){var library=new Biblioteca(root);var list=library.books();System.out.println("SQLite OK: "+list.size()+" documentos; "+list.stream().filter(b->b.reading).count()+" em leitura; "+list.stream().filter(b->b.favorite).count()+" favoritos.");return;}
+  if(Arrays.asList(args).contains("--verify")){var library=(active!=null?active:LibrarySettings.legacy()).open();var list=library.books();System.out.println("SQLite OK: "+list.size()+" documentos; "+list.stream().filter(b->b.reading).count()+" em leitura; "+list.stream().filter(b->b.favorite).count()+" favoritos.");return;}
   SwingUtilities.invokeLater(()->{
+   final LibrarySettings.Profile profile;try{profile=active!=null?active:LibraryPicker.choose(null,null);if(profile==null)return;}catch(Exception e){JOptionPane.showMessageDialog(null,e.getMessage(),"Biblioteca",JOptionPane.ERROR_MESSAGE);return;}
    var splash=new StartupSplash();splash.setVisible(true);splash.stage("Abrindo catálogo e índice de pesquisa…",20);
    new SwingWorker<Biblioteca,Void>(){
-    protected Biblioteca doInBackground()throws Exception{return new Biblioteca(root);}
+    protected Biblioteca doInBackground()throws Exception{var library=profile.open();if(explicit==null)LibrarySettings.activate(profile);return library;}
     protected void done(){try{
-     splash.stage("Preparando suas leituras e os formatos disponíveis…",70);var loaded=get();var queue=CoverQueue.start(loaded);Runtime.getRuntime().addShutdownHook(new Thread(queue::close));var app=new CatalogoApp(loaded);
+     splash.stage("Preparando suas leituras e os formatos disponíveis…",70);var loaded=get();var queue=CoverQueue.start(loaded);Runtime.getRuntime().addShutdownHook(new Thread(queue::close));var app=new CatalogoApp(loaded);app.ownedCoverQueue=queue;
      app.onReady=()->{splash.stage("Biblioteca pronta",100);app.setVisible(true);splash.dispose();};
      app.reportError=e->{splash.dispose();app.setVisible(true);app.showError(e);};
     }catch(Exception e){splash.dispose();JOptionPane.showMessageDialog(null,"Não foi possível abrir a biblioteca: "+e.getMessage(),"Catálogo de Livros",JOptionPane.ERROR_MESSAGE);}}

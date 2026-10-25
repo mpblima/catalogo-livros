@@ -76,7 +76,7 @@ jobs:
           java-version: '17'
           cache: maven
       - name: Compilar e testar
-        run: mvn -B "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest" verify
+        run: mvn -B "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest,LibrarySettingsTest,LibraryServerTest" verify
       - name: Validar SQLite na plataforma
         run: java -jar target/catalogo-livros.jar --verify --library target/smoke-library
       - name: Gerar instalador com Java incluído

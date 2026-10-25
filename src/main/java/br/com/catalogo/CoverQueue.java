@@ -10,7 +10,7 @@ final class CoverQueue implements AutoCloseable {
  private static final Map<Path,CoverQueue> queues=new ConcurrentHashMap<>();
  CoverQueue(Biblioteca library,Search search){this(library,search,null);}
  CoverQueue(Biblioteca library,Search search,Details details){this.library=library;this.search=search;this.details=details;}
- static CoverQueue start(Biblioteca library){return queues.computeIfAbsent(library.root,p->{var lookup=new BookLookup();var q=new CoverQueue(library,lookup::findCover,lookup::findDetails);q.executor.scheduleWithFixedDelay(()->{try{q.runNext();}catch(Exception e){System.err.println("Fila de capas: "+e.getMessage());}},0,5,TimeUnit.SECONDS);return q;});}
+ static CoverQueue start(Biblioteca library){return queues.computeIfAbsent(library.database,p->{var lookup=new BookLookup();var q=new CoverQueue(library,lookup::findCover,lookup::findDetails);q.executor.scheduleWithFixedDelay(()->{try{q.runNext();}catch(Exception e){System.err.println("Fila de capas: "+e.getMessage());}},0,5,TimeUnit.SECONDS);return q;});}
  static void enqueue(Connection c,String id)throws SQLException{try(var q=c.prepareStatement("INSERT OR IGNORE INTO cover_jobs(book_id) VALUES(?)")){q.setString(1,id);q.executeUpdate();}}
  private String incompleteSql(){return details==null?"v.cover_png IS NULL":"(v.cover_png IS NULL OR trim(COALESCE(v.summary,''))='' OR "+String.join(" OR ",List.of("author","publisher","year","language","pages").stream().map(k->"trim(COALESCE(json_extract(b.metadata_json,'$."+k+"'),''))=''").toList())+")";}
  void enqueueMissing()throws SQLException{
@@ -70,5 +70,5 @@ final class CoverQueue implements AutoCloseable {
    }catch(Exception e){s.execute("ROLLBACK");throw e;}
   }
  }
- @Override public void close(){executor.shutdownNow();queues.remove(library.root,this);}
+ @Override public void close(){executor.shutdownNow();queues.remove(library.database,this);}
 }
