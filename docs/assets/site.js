@@ -31,13 +31,13 @@ function renderDownloads(data) {
       if (assetUrl.protocol !== 'https:' || assetUrl.hostname !== 'github.com' || !assetUrl.pathname.includes('/releases/download/')) continue;
       const link = document.createElement('a');
       link.href = asset.url;
-      link.textContent = asset.name.endsWith('.tar.gz') ? 'Versão portátil' : `Pacote ${asset.name.split('.').pop().toUpperCase()}`;
+      link.textContent = asset.name.endsWith('.tar.gz') ? 'Versão sem instalador' : `Outra opção (.${asset.name.split('.').pop()})`;
       alternatives.append(link);
     }
-    card.querySelector('.platform-count').textContent = `${number.format(platform.downloads)} downloads nesta plataforma`;
+    card.querySelector('.platform-count').textContent = `${number.format(platform.downloads)} downloads para este sistema`;
   }
   const updated = new Date(data.updated);
-  document.querySelector('#download-status').textContent = `Último instalador estável disponível para cada plataforma. Dados atualizados em ${updated.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Contagem de arquivos baixados, não de usuários únicos.`;
+  document.querySelector('#download-status').textContent = `Versão mais recente disponível para cada sistema. Dados atualizados em ${updated.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. O contador mostra arquivos baixados, não a quantidade de pessoas.`;
 }
 async function loadDownloads() {
   try {
