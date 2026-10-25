@@ -54,3 +54,29 @@ async function loadDownloads() {
   }
 }
 loadDownloads();
+
+function selectScenario(name, focus = false) {
+  const selected = document.querySelector(`[role="tab"][data-tab="${name}"]`);
+  if (!selected) return;
+  for (const tab of document.querySelectorAll('[data-tab]')) {
+    const active = tab === selected;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+    document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+  }
+  if (focus) selected.focus();
+}
+for (const tab of document.querySelectorAll('[data-tab]')) {
+  tab.addEventListener('click', () => selectScenario(tab.dataset.tab));
+  tab.addEventListener('keydown', event => {
+    const tabs = [...document.querySelectorAll('[data-tab]')];
+    const index = tabs.indexOf(tab);
+    const offset = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (offset || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[tabs.length - 1] : tabs[(index + offset + tabs.length) % tabs.length];
+      selectScenario(target.dataset.tab, true);
+    }
+  });
+}
+for (const link of document.querySelectorAll('[data-select-tab]')) link.addEventListener('click', () => selectScenario(link.dataset.selectTab));
