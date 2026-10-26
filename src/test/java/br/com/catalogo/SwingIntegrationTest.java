@@ -101,6 +101,17 @@ class SwingIntegrationTest {
   edt(()->{app.search.setText("prog jav");app.shelf.setSelectedIndex(0);});settled();
   edt(()->assertEquals(1,app.model.getRowCount()));assertTrue(errors.isEmpty());
  }
+ @Test void unmarkingImmediatelyRemovesBookFromActiveFilter()throws Exception{
+  for(int mode:new int[]{1,2}){
+   var book=lib.books().get(0);book.reading=true;book.favorite=true;lib.save(book);
+   edt(()->{app.search.setText("prog jav");app.shelf.setSelectedIndex(mode);app.filter();});settled();
+   edt(()->{assertEquals(1,app.model.getRowCount());if(mode==1)app.reading.doClick();else app.favorite.doClick();});
+   settled();edt(()->{assertEquals(0,app.model.getRowCount());assertNull(app.selected);});
+   var saved=lib.books().get(0);assertFalse(mode==1?saved.reading:saved.favorite);
+   edt(()->app.shelf.setSelectedIndex(0));settled();edt(()->assertEquals(1,app.model.getRowCount()));
+  }
+  assertTrue(errors.isEmpty());
+ }
  @Test void preservesUnsavedNotesWhenUpdateRefreshFails()throws Exception{
   edt(()->{app.notes.setText("Texto que não pode sumir");app.autoSave.stop();});
   try(var c=lib.connect();var s=c.createStatement()){s.execute("CREATE TRIGGER fail_marks BEFORE UPDATE ON marks BEGIN SELECT RAISE(ABORT,'Falha simulada'); END");}
