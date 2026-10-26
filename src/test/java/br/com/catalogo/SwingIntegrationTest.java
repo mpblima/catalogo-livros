@@ -82,10 +82,24 @@ class SwingIntegrationTest {
   edt(()->{var bar=(JPanel)reader.getContentPane().getComponent(0);JProgressBar progress=null;for(Component component:bar.getComponents()){if(component instanceof JProgressBar p)progress=p;else if(component instanceof JPanel panel)for(Component child:panel.getComponents())if(child instanceof JProgressBar p)progress=p;}assertNotNull(progress);progress.setVisible(false);bar.doLayout();int x=bar.getComponent(0).getX();progress.setVisible(true);bar.doLayout();assertEquals(x,bar.getComponent(0).getX(),"Indicador não deve deslocar controles a cada página");});
  }
  @Test void searchesWithoutBlockingAndOpensFolder()throws Exception{
-  edt(()->{assertEquals("Livro",app.model.getColumnName(0));assertEquals("Programação Java",app.model.getValueAt(0,0));Path[] opened={null};app.openFolder=p->opened[0]=p;app.table.moveColumn(1,0);var cell=app.table.getCellRect(0,0,true);app.table.dispatchEvent(new java.awt.event.MouseEvent(app.table,java.awt.event.MouseEvent.MOUSE_CLICKED,System.currentTimeMillis(),0,cell.x+10,cell.y+10,1,false,java.awt.event.MouseEvent.BUTTON1));assertEquals(pdf.getParent(),opened[0]);app.table.moveColumn(0,1);app.category="nenhuma";app.shelf.setSelectedIndex(2);app.search.setText("prog jav");});settled();edt(()->assertEquals(1,app.model.getRowCount()));
+  edt(()->{assertEquals("Livro",app.model.getColumnName(0));assertEquals("Programação Java",app.model.getValueAt(0,0));Path[] opened={null};app.openFolder=p->opened[0]=p;app.table.moveColumn(1,0);var cell=app.table.getCellRect(0,0,true);app.table.dispatchEvent(new java.awt.event.MouseEvent(app.table,java.awt.event.MouseEvent.MOUSE_CLICKED,System.currentTimeMillis(),0,cell.x+10,cell.y+10,1,false,java.awt.event.MouseEvent.BUTTON1));assertEquals(pdf.getParent(),opened[0]);app.table.moveColumn(0,1);app.category="nenhuma";app.shelf.setSelectedIndex(0);app.search.setText("prog jav");});settled();edt(()->assertEquals(1,app.model.getRowCount()));
   // Segurar uma escrita força a busca a esperar pelo SQLite; a thread da interface continua livre.
   try(var c=lib.connect();var s=c.createStatement()){s.execute("BEGIN IMMEDIATE");edt(()->app.search.setText("editora exemplo"));Thread.sleep(300);edt(()->{assertNotNull(app.searchWorker);assertFalse(app.searchWorker.isDone());app.status.setText("Interface continua respondendo");});s.execute("ROLLBACK");}settled();edt(()->assertEquals(1,app.model.getRowCount()));
   edt(()->{app.search.setText("inexistente");app.search.setText("prog");app.search.setText("inexistente");});settled();edt(()->assertEquals(0,app.model.getRowCount()));assertTrue(errors.isEmpty());
+ }
+ @Test void searchRespectsReadingAndFavoriteFilters()throws Exception{
+  edt(()->{app.search.setText("prog jav");app.shelf.setSelectedIndex(1);});settled();
+  edt(()->assertEquals(0,app.model.getRowCount()));
+  var book=lib.books().get(0);book.reading=true;lib.save(book);
+  edt(app::filter);settled();edt(()->assertEquals(1,app.model.getRowCount()));
+  edt(()->app.shelf.setSelectedIndex(2));settled();edt(()->assertEquals(0,app.model.getRowCount()));
+  book.favorite=true;lib.save(book);
+  edt(app::filter);settled();edt(()->assertEquals(1,app.model.getRowCount()));
+  edt(()->app.search.setText("inexistente"));settled();edt(()->assertEquals(0,app.model.getRowCount()));
+  edt(()->app.search.setText(""));settled();edt(()->assertEquals(1,app.model.getRowCount()));
+  book.favorite=false;lib.save(book);
+  edt(()->{app.search.setText("prog jav");app.shelf.setSelectedIndex(0);});settled();
+  edt(()->assertEquals(1,app.model.getRowCount()));assertTrue(errors.isEmpty());
  }
  @Test void preservesUnsavedNotesWhenUpdateRefreshFails()throws Exception{
   edt(()->{app.notes.setText("Texto que não pode sumir");app.autoSave.stop();});

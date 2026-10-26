@@ -66,7 +66,7 @@ public final class CatalogoApp extends JFrame {
   var header=UiTheme.panel(new BorderLayout(0,20));var hero=UiTheme.panel(new BorderLayout(20,0));
   var identity=UiTheme.panel(new BorderLayout(16,0));identity.add(new JLabel(new UiTheme.BookIcon(54)),BorderLayout.WEST);var brandText=UiTheme.panel(new BorderLayout(0,3));brandText.add(UiTheme.eyebrow("SEU ACERVO PESSOAL"),BorderLayout.NORTH);var brand=new JLabel("Biblioteca");brand.setFont(new Font("Serif",Font.BOLD,34));brandText.add(brand);identity.add(brandText);hero.add(identity,BorderLayout.WEST);
   var metrics=UiTheme.panel(new FlowLayout(FlowLayout.RIGHT,28,4));metrics.add(metric("LIVROS",collectionStat));metrics.add(metric("EM LEITURA",readingStat));metrics.add(metric("FAVORITOS",favoriteStat));hero.add(metrics,BorderLayout.EAST);header.add(hero,BorderLayout.NORTH);
-  search.putClientProperty("JTextField.placeholderText","Pesquisar por título, autor, editora ou assunto…");search.setPreferredSize(new Dimension(400,46));search.setToolTipText("Pesquise palavras ou partes de palavras em todo o acervo");
+  search.putClientProperty("JTextField.placeholderText","Pesquisar por título, autor, editora ou assunto…");search.setPreferredSize(new Dimension(400,46));search.setToolTipText("Pesquise palavras ou partes de palavras usando o filtro selecionado em Explorar");shelf.setToolTipText("Filtre os livros, inclusive nos resultados da busca");
   var commandBar=UiTheme.panel(new BorderLayout(16,0));commandBar.add(search);var actions=UiTheme.panel(new FlowLayout(FlowLayout.RIGHT,10,0));UiTheme.primary(update);var arbitrary=new JButton("Abrir arquivo…");actions.add(switchLibrary);switchLibrary.setToolTipText(library.root+" · "+library.database.getFileName());switchLibrary.addActionListener(e->chooseLibrary());actions.add(arbitrary);actions.add(newPhysical);actions.add(update);commandBar.add(actions,BorderLayout.EAST);header.add(commandBar,BorderLayout.SOUTH);main.add(header,BorderLayout.NORTH);
   var sidebar=new JPanel(new BorderLayout(0,18));sidebar.setBorder(UiTheme.card());sidebar.setPreferredSize(new Dimension(235,400));
   var navigation=UiTheme.panel(new BorderLayout(0,10));navigation.add(UiTheme.eyebrow("EXPLORAR"),BorderLayout.NORTH);navigation.add(shelf);sidebar.add(navigation,BorderLayout.NORTH);tree.setRootVisible(true);tree.setBorder(BorderFactory.createEmptyBorder(4,0,4,0));sidebar.add(UiTheme.scroll(tree));
@@ -148,7 +148,7 @@ public final class CatalogoApp extends JFrame {
   }
   visible=new ArrayList<>();visibleGroups=new ArrayList<>();var data=new ArrayList<Object[]>();
   for(var group:WorkGroups.group(all,snapshot.relations())){
-   final int filterMode=searching?0:mode;
+   final int filterMode=mode;
    boolean matches=group.books().stream().anyMatch(b->snapshot.hits().contains(b.id)&&(searching||chosenCategory.isBlank()||b.section.equals(chosenCategory)||b.section.startsWith(chosenCategory+"/"))&&(filterMode==0||filterMode==1&&b.reading||filterMode==2&&b.favorite||filterMode==3&&!b.notes.isBlank()||filterMode==4&&(b.title==null||b.title.isBlank())));
    if(!matches)continue;var b=group.primary();visible.add(b);visibleGroups.add(group);
    String categories=String.join("; ",group.books().stream().map(x->x.section.replace('_',' ').replace("/"," / ")).distinct().toList());
@@ -156,7 +156,7 @@ public final class CatalogoApp extends JFrame {
   }
   selected=null;model.setDataVector(data.toArray(Object[][]::new),new String[]{"Livro","Arquivo / ISBN","Autor","Categoria/Subcategoria"});
   table.getColumnModel().getColumn(0).setPreferredWidth(480);table.getColumnModel().getColumn(1).setPreferredWidth(280);table.getColumnModel().getColumn(2).setPreferredWidth(145);table.getColumnModel().getColumn(3).setPreferredWidth(240);
-  clear();loading=false;status.setText(visible.size()+" obras exibidas · "+all.size()+" livros na biblioteca"+(searching?" · busca em todo o acervo":""));
+  clear();loading=false;status.setText(visible.size()+" obras exibidas · "+all.size()+" livros na biblioteca"+(searching?" · busca"+(mode==0?" em todo o acervo":" · "+shelf.getItemAt(mode)):""));
   int row=0;if(chosenId!=null)for(int i=0;i<visibleGroups.size();i++)if(visibleGroups.get(i).books().stream().anyMatch(b->b.id.equals(chosenId))){row=i;break;}
   if(!visible.isEmpty()){table.setRowSelectionInterval(table.convertRowIndexToView(row),table.convertRowIndexToView(row));if(chosenId!=null){var book=visibleGroups.get(row).books().stream().filter(b->b.id.equals(chosenId)).findFirst().orElse(null);if(book!=null){loading=true;versions.setSelectedItem(book);loading=false;fill(book);}}}
   if(!readyDelivered){readyDelivered=true;onReady.run();}
