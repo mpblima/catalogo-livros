@@ -139,3 +139,13 @@ Também é possível abrir uma combinação específica sem alterar a seleção 
 ```bash
 ~/Apps/Catalogo/catalogo --library /caminho/dos/livros --database minha-biblioteca.sqlite
 ```
+
+## Conta e sincronização com o catálogo web
+
+O botão **Conta / sincronização…** conecta o perfil SQLite aberto a um catálogo próprio na web. A autorização ocorre no navegador, com um código temporário; nenhuma senha é solicitada pelo desktop. Use **Sincronizar catálogo** para enviar e receber livros físicos e digitais, seus campos bibliográficos e metadados extras, capas, categorias, relações entre edições/amostras, favoritos e anotações com autoria. A conexão pode ser revogada na web ou no aplicativo.
+
+Os arquivos PDF/EPUB e o estado privado do leitor (página/posição) permanecem neste computador. Um cadastro recebido da nuvem sem arquivo local continua visível, mas não pode abrir ou movimentar um arquivo remoto. A sincronização preserva os arquivos existentes e nunca os exclui. Exclusões de cadastros físicos locais só são propagadas com confirmação; exclusões remotas desativam o cadastro local, preservando os arquivos.
+
+Alterações concorrentes aparecem na aba **Conflitos** para decisão explícita. Lotes interrompidos são retomados sem duplicar cadastros/anotações. As credenciais do dispositivo ficam fora do SQLite, em arquivo privado por perfil, e expiram em até 30 dias. Conectar não inicia um envio automaticamente. Antes da primeira sincronização, confira a conta e o catálogo escolhidos.
+
+O protocolo real Java/Go é validado no CI do repositório web contra PostgreSQL descartável, além dos testes locais Java e Swing. Não use uma base pessoal nos testes de integração.

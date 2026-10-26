@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [master]
   push:
-    branches: [master]
+    branches: [master, "feature/**"]
     paths-ignore:
       - 'docs/**'
       - 'scripts/build_pages.py'
@@ -38,10 +38,10 @@ jobs:
       - name: Validar OCR
         run: java -jar target/catalogo-livros.jar --verify-ocr
       - name: Gerar instaladores
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         run: ./empacotar_java.sh "2.0.${{ github.run_number }}"
       - name: Validar instalador independente do código-fonte
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         run: |
           dist/*.run --prefix "$RUNNER_TEMP/catalogo_teste" --no-integrate
           mvn -B -Dtest=InstallationIntegrationTest -Dcatalogo.binary="$RUNNER_TEMP/catalogo_teste/catalogo" test
@@ -52,7 +52,7 @@ jobs:
           name: testes-java
           path: target/surefire-reports/
       - uses: actions/upload-artifact@v7.0.2
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         with:
           name: installers-linux
           path: dist/*
@@ -76,7 +76,7 @@ jobs:
           java-version: '17'
           cache: maven
       - name: Compilar e testar
-        run: mvn -B "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest,LibrarySettingsTest,LibraryServerTest" verify
+        run: mvn -B "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest,LibrarySettingsTest,LibraryServerTest,CloudSyncTest" verify
       - name: Validar SQLite na plataforma
         run: java -jar target/catalogo-livros.jar --verify --library target/smoke-library
       - name: Gerar instalador com Java incluído
@@ -97,7 +97,7 @@ jobs:
           path: dist/*
           if-no-files-found: error
   release:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     needs: [build, native]
     runs-on: ubuntu-24.04
     permissions:
@@ -110,7 +110,7 @@ jobs:
           merge-multiple: true
           path: dist
       - name: Publicar release
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: 2.0.${{ github.run_number }}
