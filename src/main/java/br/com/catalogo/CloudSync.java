@@ -9,6 +9,7 @@ import java.sql.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.concurrent.ConcurrentHashMap;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;
 
@@ -20,6 +21,7 @@ final class CloudSync {
  record Local(String id,boolean active,ObjectNode book,String cover){}
  record Link(String localId,String cloudId,long version,String hash,String base,boolean deleted,boolean restore){}
  final Biblioteca lib;final HttpClient http;final String databaseId;final Path config;
+ private static final ConcurrentHashMap<Path,Object> SYNC_LOCKS=new ConcurrentHashMap<>();
  static final Set<String> PRIVATE=Set.of("page","reader_position","pdf_scroll","epub_location","ocr_text","access_token","clerk_secret_key","password","api_key");
  CloudSync(Biblioteca lib)throws Exception{this(lib,HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());}
  CloudSync(Biblioteca lib,HttpClient http)throws Exception{
@@ -34,6 +36,8 @@ final class CloudSync {
    s.execute("CREATE TABLE IF NOT EXISTS cloud_conflicts(scope TEXT NOT NULL,local_id TEXT NOT NULL,local_payload TEXT NOT NULL,remote_event TEXT NOT NULL,PRIMARY KEY(scope,local_id))");
    s.execute("CREATE TABLE IF NOT EXISTS cloud_comments(scope TEXT NOT NULL,id TEXT NOT NULL,cloud_book_id TEXT NOT NULL,body TEXT NOT NULL,author_name TEXT NOT NULL,author_email TEXT NOT NULL,origin TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(scope,id))");
    s.execute("CREATE TABLE IF NOT EXISTS cloud_pending_notes(scope TEXT NOT NULL,id TEXT PRIMARY KEY,local_book_id TEXT NOT NULL,body TEXT NOT NULL)");
+   s.execute("CREATE TABLE IF NOT EXISTS cloud_preferences(singleton INTEGER PRIMARY KEY CHECK(singleton=1),interval_minutes INTEGER NOT NULL DEFAULT 5)");
+   s.execute("INSERT OR IGNORE INTO cloud_preferences(singleton,interval_minutes)VALUES(1,5)");
   }
   Path folder=Path.of(System.getProperty("catalogo.cloud.config",Path.of(System.getProperty("user.home"),".local","share","catalogo_livros","cloud").toString()));Files.createDirectories(folder);
   config=folder.resolve(hash(lib.database.toAbsolutePath().normalize()+"|"+databaseId)+".json");
@@ -123,7 +127,10 @@ final class CloudSync {
   }
   try(var q=c.prepareStatement("UPDATE cloud_state SET cursor=?,pending_request=NULL WHERE scope=?")){q.setLong(1,response.path("cursor").asLong());q.setString(2,scope);q.executeUpdate();}c.commit();
  }catch(Exception e){c.rollback();throw e;}}lib.refreshSearchIndex();return downloaded;}
- Result sync(boolean confirmDeletes,Consumer<String> progress)throws Exception{
+ int syncIntervalMinutes()throws Exception{try(var c=lib.connect();var s=c.createStatement();var r=s.executeQuery("SELECT interval_minutes FROM cloud_preferences WHERE singleton=1")){return r.next()?r.getInt(1):5;}}
+ void syncIntervalMinutes(int minutes)throws Exception{if(minutes<0||minutes>1440)throw new IllegalArgumentException("Use sincronização manual ou um intervalo entre 1 minuto e 24 horas.");try(var c=lib.connect();var q=c.prepareStatement("UPDATE cloud_preferences SET interval_minutes=? WHERE singleton=1")){q.setInt(1,minutes);q.executeUpdate();}}
+ Result sync(boolean confirmDeletes,Consumer<String> progress)throws Exception{synchronized(SYNC_LOCKS.computeIfAbsent(lib.database.toAbsolutePath().normalize(),p->new Object())){return syncLocked(confirmDeletes,progress);}}
+ private Result syncLocked(boolean confirmDeletes,Consumer<String> progress)throws Exception{
   var info=connection();if(info==null)throw new IllegalStateException("Conecte uma conta antes de sincronizar.");int uploaded=0,downloaded=0;
   String retry=pending(info);if(retry!=null&&!retry.isBlank()){progress.accept("Retomando o último lote…");var body=(ObjectNode)Biblioteca.JSON.readTree(retry);var result=request(info.api(),"/api/catalogs/"+info.catalogId()+"/sync",info.token(),body);downloaded+=apply(info,body,result);uploaded+=result.path("accepted").size();}
   var changes=changes(info,confirmDeletes);var chunk=new ArrayList<ObjectNode>();int size=0;for(var change:changes){if(Thread.currentThread().isInterrupted())throw new InterruptedException();int length=change.toString().getBytes(StandardCharsets.UTF_8).length;if(length>1400000)throw new IllegalStateException("Um cadastro excede o tamanho permitido para sincronização. Revise seus metadados e capa.");if(!chunk.isEmpty()&&(size+length>1400000||chunk.size()>=50)){var body=batch(info,chunk,confirmDeletes,false);pending(info,body.toString());progress.accept("Enviando "+chunk.size()+" cadastros…");var response=request(info.api(),"/api/catalogs/"+info.catalogId()+"/sync",info.token(),body);downloaded+=apply(info,body,response);uploaded+=response.path("accepted").size();chunk.clear();size=0;}chunk.add(change);size+=length;}

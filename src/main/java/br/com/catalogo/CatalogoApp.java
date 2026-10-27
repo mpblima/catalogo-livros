@@ -15,6 +15,7 @@ import java.util.List;
 /** Catálogo desktop Swing: não usa navegador nem servidor para a interface. */
 public final class CatalogoApp extends JFrame {
  final Biblioteca library;
+ final CloudSync cloudSync;
  CoverQueue ownedCoverQueue;
  final JButton switchLibrary=new JButton("Biblioteca / banco…");
  final JButton cloud=new JButton("Conta / sincronização…");
@@ -55,13 +56,15 @@ public final class CatalogoApp extends JFrame {
  final JButton newPhysical=new JButton("Novo livro físico");
  final JButton update=new JButton("Catalogar livros digitais"),open=new JButton("Abrir e continuar"),move=new JButton("Alterar categoria");
  final javax.swing.Timer autoSave;
+ final javax.swing.Timer cloudSyncTimer;long lastCloudSync=0;boolean cloudSyncBusy=false;
  java.util.function.Consumer<Path> openFolder=this::external;
  String category="";boolean loading=false,busy=false;String lastSaved="";
  public CatalogoApp(Biblioteca lib)throws Exception {this(lib,true);}
  CatalogoApp(Biblioteca lib,boolean automaticStartup)throws Exception {
-  super("Catálogo de Livros");library=lib;setTitle("Catálogo de Livros · "+lib.root+" · "+lib.database.getFileName());
+  super("Catálogo de Livros");library=lib;cloudSync=new CloudSync(lib);setTitle("Catálogo de Livros · "+lib.root+" · "+lib.database.getFileName());
   setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);setMinimumSize(new Dimension(1050,700));setSize(1480,960);setLocationRelativeTo(null);setIconImage(UiTheme.appIcon());
   autoSave=new javax.swing.Timer(650,e->save());autoSave.setRepeats(false);
+  cloudSyncTimer=new javax.swing.Timer(10000,e->automaticCloudSync());cloudSyncTimer.start();
   searchDelay=new javax.swing.Timer(180,e->runSearch());searchDelay.setRepeats(false);
   var main=new JPanel(new BorderLayout(22,22));main.setBackground(UiTheme.BACKGROUND);main.setBorder(BorderFactory.createEmptyBorder(26,28,18,28));setContentPane(main);
   var header=UiTheme.panel(new BorderLayout(0,20));var hero=UiTheme.panel(new BorderLayout(20,0));
@@ -184,7 +187,8 @@ public final class CatalogoApp extends JFrame {
   };previewWorker.execute();
  }
  void pollCover(){if(!closed&&isShowing()&&selected!=null&&selected.physical()&&(previewWorker==null||previewWorker.isDone()))loadPreview(selected,false);}
- @Override public void dispose(){coverRefresh.stop();if(ownedCoverQueue!=null)ownedCoverQueue.close();super.dispose();}
+ void automaticCloudSync(){if(closed||cloudSyncBusy)return;try{int minutes=cloudSync.syncIntervalMinutes();if(minutes<=0||System.currentTimeMillis()-lastCloudSync<minutes*60000L)return;var info=cloudSync.connection();if(info==null||!save())return;cloudSyncBusy=true;lastCloudSync=System.currentTimeMillis();new SwingWorker<CloudSync.Result,Void>(){protected CloudSync.Result doInBackground()throws Exception{return cloudSync.sync(false,s->{});}protected void done(){cloudSyncBusy=false;try{var result=get();if(result.uploaded()+result.downloaded()>0){status.setText("Sincronizado com a nuvem · "+new java.text.SimpleDateFormat("HH:mm").format(new java.util.Date()));filter();}}catch(Exception e){lastCloudSync=System.currentTimeMillis()-Math.max(0,minutes*60000L-60000L);Throwable cause=e;while(cause.getCause()!=null&&cause instanceof java.util.concurrent.ExecutionException)cause=cause.getCause();status.setText("Falha na sincronização automática: "+Objects.toString(cause.getMessage(),"serviço indisponível"));}}}.execute();}catch(Exception e){status.setText("Sincronização automática indisponível: "+e.getMessage());}}
+ @Override public void dispose(){cloudSyncTimer.stop();coverRefresh.stop();if(ownedCoverQueue!=null)ownedCoverQueue.close();super.dispose();}
  boolean confirmDeletion(Biblioteca.Book book){return JOptionPane.showConfirmDialog(this,"Excluir o cadastro de "+book.title+"?\nAs marcações deste cadastro serão removidas."+(book.physical()?"":"\nO arquivo digital será preservado e ignorado nas próximas catalogagens."),"Excluir cadastro",JOptionPane.YES_NO_OPTION,JOptionPane.WARNING_MESSAGE)==JOptionPane.YES_OPTION;}
  void deleteSelected(){
   if(selected==null||!selected.physical()||busy||!save())return;var book=selected;if(!confirmDelete.test(book))return;
