@@ -12,6 +12,7 @@ licenses="$repo/src/main/resources/catalogo/ocr/licencas/macos"
 [[ "$(uname -m)" == arm64 ]] || { echo 'O pacote macOS de OCR exige runner arm64.' >&2; exit 1; }
 rm -rf "$tool_root" "$native" "$licenses"
 mkdir -p "$(dirname "$tool_root")" "$native" "$licenses"
+python3 "$repo/packaging/download_tessdata.py" "$repo/src/main/resources/catalogo/ocr"
 git clone --depth 1 --branch "$vcpkg_ref" https://github.com/microsoft/vcpkg.git "$tool_root"
 (cd "$tool_root" && ./bootstrap-vcpkg.sh -disableMetrics)
 mkdir -p "$overlay"

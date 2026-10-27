@@ -7,11 +7,14 @@ $triplet = 'x64-windows-static-crt-dynamic'
 $installed = Join-Path $toolRoot "installed/$triplet"
 $native = Join-Path $repo 'src/main/resources/catalogo/ocr/native/windows-x86_64'
 $licenses = Join-Path $repo 'src/main/resources/catalogo/ocr/licencas/windows'
+$ocrResources = Join-Path $repo 'src/main/resources/catalogo/ocr'
 
 if (Test-Path $toolRoot) { Remove-Item -Recurse -Force $toolRoot }
 if (Test-Path $native) { Remove-Item -Recurse -Force $native }
 if (Test-Path $licenses) { Remove-Item -Recurse -Force $licenses }
 New-Item -ItemType Directory -Force $native, $licenses, (Split-Path $toolRoot) | Out-Null
+python (Join-Path $PSScriptRoot 'download_tessdata.py') $ocrResources
+if ($LASTEXITCODE -ne 0) { throw 'Não foi possível obter os modelos OCR inglês e português.' }
 git clone --depth 1 --branch $vcpkgRef https://github.com/microsoft/vcpkg.git $toolRoot
 if ($LASTEXITCODE -ne 0) { throw 'Não foi possível obter o vcpkg.' }
 & (Join-Path $toolRoot 'bootstrap-vcpkg.bat') -disableMetrics
