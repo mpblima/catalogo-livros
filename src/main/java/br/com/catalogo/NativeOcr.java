@@ -9,12 +9,12 @@ final class NativeOcr implements AutoCloseable {
  }
  private final Api api;private Pointer handle;
  NativeOcr()throws Exception {
-  var flags=Map.<String,Object>of(Library.OPTION_OPEN_FLAGS,0x101);
-  NativeLibrary.getInstance(Resources.materialize("ocr/native/libgomp.so.1").toString(),flags).getFunction("omp_set_num_threads").invokeVoid(new Object[]{1});
-  NativeLibrary.getInstance(Resources.materialize("ocr/native/libleptonica.so").toString(),flags);
-  api=Native.load(Resources.materialize("ocr/native/libtesseract.so.5").toString(),Api.class,flags);handle=api.TessBaseAPICreate();
+  var bundle=Resources.ocrNative();var flags=bundle.flags();
+  if(bundle.openmp()!=null)NativeLibrary.getInstance(bundle.openmp().toString(),flags).getFunction("omp_set_num_threads").invokeVoid(new Object[]{1});
+  NativeLibrary.getInstance(bundle.leptonica().toString(),flags);
+  api=Native.load(bundle.tesseract().toString(),Api.class,flags);handle=api.TessBaseAPICreate();
   if(handle==null||api.TessBaseAPIInit3(handle,Resources.tessdata().toString(),"eng+por")!=0){close();throw new IllegalStateException("Não foi possível iniciar o OCR incluído na aplicação");}
-  api.TessBaseAPISetVariable(handle,"debug_file","/dev/null");
+  api.TessBaseAPISetVariable(handle,"debug_file",System.getProperty("os.name","").toLowerCase(Locale.ROOT).contains("windows")?"NUL":"/dev/null");
  }
  java.util.List<DocumentExtractor.Line> lines(BufferedImage image)throws Exception {
   var gray=new BufferedImage(image.getWidth(),image.getHeight(),BufferedImage.TYPE_BYTE_GRAY);var graphics=gray.createGraphics();graphics.setColor(Color.WHITE);graphics.fillRect(0,0,gray.getWidth(),gray.getHeight());graphics.drawImage(image,0,0,null);graphics.dispose();byte[] data=((DataBufferByte)gray.getRaster().getDataBuffer()).getData();

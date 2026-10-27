@@ -61,7 +61,7 @@ public final class CatalogoApp extends JFrame {
  String category="";boolean loading=false,busy=false;String lastSaved="";
  public CatalogoApp(Biblioteca lib)throws Exception {this(lib,true);}
  CatalogoApp(Biblioteca lib,boolean automaticStartup)throws Exception {
-  super("Catálogo de Livros");library=lib;cloudSync=new CloudSync(lib);setTitle("Catálogo de Livros · "+lib.root+" · "+lib.database.getFileName());
+  super("Catálogo de Livros");library=lib;cloudSync=new CloudSync(lib);setTitle("Catálogo de Livros · "+lib.root+" · "+lib.database.getFileName());if(BackgroundCatalogService.supported())setJMenuBar(serviceMenu());
   setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);setMinimumSize(new Dimension(1050,700));setSize(1480,960);setLocationRelativeTo(null);setIconImage(UiTheme.appIcon());
   autoSave=new javax.swing.Timer(650,e->save());autoSave.setRepeats(false);
   cloudSyncTimer=new javax.swing.Timer(10000,e->automaticCloudSync());cloudSyncTimer.start();
@@ -107,6 +107,7 @@ public final class CatalogoApp extends JFrame {
  }
  void refreshCounters(){collectionStat.setText(String.format(java.util.Locale.forLanguageTag("pt-BR"),"%,d",all.size()));readingStat.setText(String.valueOf(all.stream().filter(b->b.reading).count()));favoriteStat.setText(String.valueOf(all.stream().filter(b->b.favorite).count()));}
  static JPanel metric(String label,JLabel value){var panel=UiTheme.panel(new BorderLayout(0,5));value.setFont(value.getFont().deriveFont(Font.BOLD,23));panel.add(value,BorderLayout.NORTH);panel.add(UiTheme.eyebrow(label));return panel;}
+ JMenuBar serviceMenu(){var bar=new JMenuBar();var menu=new JMenu("Catálogo local");var automatic=new JCheckBoxMenuItem("Iniciar servidor HTML no login",BackgroundCatalogService.automatic());automatic.addActionListener(e->{boolean enabled=automatic.isSelected();automatic.setEnabled(false);new SwingWorker<Void,Void>(){protected Void doInBackground()throws Exception{BackgroundCatalogService.automatic(enabled);if(enabled)BackgroundCatalogService.ensureInstalled();else BackgroundCatalogService.disable();return null;}protected void done(){automatic.setEnabled(true);try{get();}catch(Exception ex){BackgroundCatalogService.automatic(!enabled);automatic.setSelected(!enabled);Throwable cause=ex.getCause()==null?ex:ex.getCause();showError(new Exception("Não foi possível atualizar a inicialização do servidor HTML: "+Objects.toString(cause.getMessage(),"erro desconhecido")));}}}.execute();});menu.add(automatic);bar.add(menu);return bar;}
  static DocumentListener listener(Runnable run){return new DocumentListener(){public void insertUpdate(DocumentEvent e){run.run();}public void removeUpdate(DocumentEvent e){run.run();}public void changedUpdate(DocumentEvent e){run.run();}};}
  static final class DetailsPanel extends JPanel implements Scrollable {
   DetailsPanel(){super(new BorderLayout(12,14));}
@@ -242,11 +243,12 @@ public final class CatalogoApp extends JFrame {
   SwingUtilities.invokeLater(()->{
    final LibrarySettings.Profile profile;try{profile=active!=null?active:LibraryPicker.choose(null,null);if(profile==null)return;}catch(Exception e){JOptionPane.showMessageDialog(null,e.getMessage(),"Biblioteca",JOptionPane.ERROR_MESSAGE);return;}
    var splash=new StartupSplash();splash.setVisible(true);splash.stage("Abrindo catálogo e índice de pesquisa…",20);
+   String[] serviceWarning={null};
    new SwingWorker<Biblioteca,Void>(){
-    protected Biblioteca doInBackground()throws Exception{var library=profile.open();if(explicit==null)LibrarySettings.activate(profile);return library;}
+    protected Biblioteca doInBackground()throws Exception{var library=profile.open();if(explicit==null)LibrarySettings.activate(profile);try{BackgroundCatalogService.ensureInstalled();}catch(Exception e){serviceWarning[0]=e.getMessage();System.err.println("Servidor HTML em segundo plano: "+e.getMessage());}return library;}
     protected void done(){try{
      splash.stage("Preparando suas leituras e os formatos disponíveis…",70);var loaded=get();var queue=CoverQueue.start(loaded);Runtime.getRuntime().addShutdownHook(new Thread(queue::close));var app=new CatalogoApp(loaded);app.ownedCoverQueue=queue;
-     app.onReady=()->{splash.stage("Biblioteca pronta",100);app.setVisible(true);splash.dispose();};
+     app.onReady=()->{splash.stage("Biblioteca pronta",100);app.setVisible(true);if(serviceWarning[0]!=null)app.status.setText("Servidor HTML não foi iniciado automaticamente: "+serviceWarning[0]);splash.dispose();};
      app.reportError=e->{splash.dispose();app.setVisible(true);app.showError(e);};
     }catch(Exception e){splash.dispose();JOptionPane.showMessageDialog(null,"Não foi possível abrir a biblioteca: "+e.getMessage(),"Catálogo de Livros",JOptionPane.ERROR_MESSAGE);}}
    }.execute();

@@ -13,7 +13,7 @@ chmod +x catalogo-livros-*-linux-x86_64.run
 
 O instalador pessoal inclui o Java, instala em `~/Apps/Catalogo`, cria um atalho no Desktop e ativa um serviço local para o catálogo HTML. A biblioteca padrão é `~/Desktop/Livros`; o SQLite fica dentro dela. Livros, favoritos, páginas e anotações são mantidos ao atualizar. A instalação anterior fica em uma pasta de backup ao lado de `Catalogo`. Feche as janelas da versão anterior antes de reabrir pelo atalho.
 
-Também são distribuídos um `.deb` para instalação no sistema e um `.tar.gz` com a aplicação portátil. O `.run` é a opção recomendada para o diretório pessoal; o `.deb` oferece lançamento pelo menu do sistema. Linux x86_64; as releases de CI são compiladas no Ubuntu 24.04. OCR usa Tesseract e Leptonica incluídos, além de bibliotecas comuns do sistema operacional.
+Também são distribuídos um `.deb` para instalação no sistema e um `.tar.gz` com a aplicação portátil. O `.run` é a opção recomendada para o diretório pessoal; o `.deb` oferece lançamento pelo menu do sistema. Linux x86_64; as releases de CI são compiladas no Ubuntu 24.04. As versões Windows x64 e macOS ARM64 também incluem Tesseract, Leptonica, os modelos português/inglês e as bibliotecas nativas necessárias; OCR e catalogação de PDFs digitalizados funcionam nas três plataformas. Na primeira abertura após instalar Windows ou macOS, o aplicativo registra o serviço do catálogo HTML para iniciar no login, sem privilégios administrativos. O menu **Catálogo local** permite desligar e reativar essa inicialização.
 
 ## Usar
 
@@ -44,7 +44,7 @@ packaging/                      montagem do OCR e instalação
 .github/workflows/release.yml   testes, instaladores e releases
 ```
 
-Requisitos de compilação: JDK 17, Maven, `jpackage`, `fakeroot`, bibliotecas Tesseract/Leptonica/OpenMP, modelos OCR português e inglês. No Ubuntu:
+Requisitos de compilação Linux: JDK 17, Maven, `jpackage`, `fakeroot`, bibliotecas Tesseract/Leptonica/OpenMP e modelos OCR português e inglês. No Ubuntu:
 
 ```bash
 sudo apt-get install libtesseract5 libleptonica-dev libgomp1 tesseract-ocr-eng tesseract-ocr-por xvfb fakeroot
@@ -54,7 +54,7 @@ java -jar target/catalogo-livros.jar --verify-ocr
 ./empacotar_java.sh 2.0.0
 ```
 
-Os três scripts shell são ferramentas de compilação/instalação, não processadores de livros. Os recursos OCR são obtidos do sistema de compilação e incluídos no instalador; não é necessário instalar Maven ou o código-fonte na máquina de uso.
+O workflow compila Tesseract e Leptonica para Windows x64 e macOS ARM64 usando vcpkg nos runners nativos, reúne as dependências e avisos de licença e inclui esses recursos no instalador. Usuários não precisam instalar Tesseract, Maven ou o código-fonte. Os instaladores nativos também incluem um inicializador separado para o serviço HTML, registrado por usuário no primeiro uso.
 
 Comandos opcionais da aplicação:
 
@@ -103,8 +103,8 @@ baixada e armazenada no SQLite ao salvar.
 
 O pipeline gera instaladores Linux (`.run`, `.deb` e arquivo portátil), Windows
 (`.msi`, x64) e macOS (`.dmg`, ARM64), com Java incluído. A publicação aguarda os
-três jobs. Windows e macOS ainda precisam de validação dos instaladores nesses
-sistemas; o OCR nativo incluído atualmente é específico do Linux x64.
+três jobs; os dois runners nativos preparam as bibliotecas OCR próprias da
+plataforma antes de empacotar o aplicativo.
 
 ## Página do projeto
 

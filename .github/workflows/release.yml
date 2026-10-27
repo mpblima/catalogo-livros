@@ -75,8 +75,21 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+      - uses: actions/setup-python@v6.1.0
+        if: matrix.platform == 'windows'
+        with:
+          python-version: '3.13'
+      - name: Preparar OCR incluído (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./packaging/preparar_ocr_windows.ps1
+      - name: Preparar OCR incluído (macOS)
+        if: matrix.platform == 'macos'
+        run: ./packaging/preparar_ocr_macos.sh
       - name: Compilar e testar
         run: mvn -B "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest,LibrarySettingsTest,LibraryServerTest,CloudSyncTest" verify
+      - name: Validar OCR incluído na plataforma
+        run: java -jar target/catalogo-livros.jar --verify-ocr
       - name: Validar SQLite na plataforma
         run: java -jar target/catalogo-livros.jar --verify --library target/smoke-library
       - name: Gerar instalador com Java incluído
@@ -84,7 +97,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force target/package-input | Out-Null
           Copy-Item target/catalogo-livros.jar target/package-input/
-          $options = @('--type', '${{ matrix.type }}', '--name', 'CatalogoLivros', '--app-version', '2.0.${{ github.run_number }}', '--input', 'target/package-input', '--main-jar', 'catalogo-livros.jar', '--dest', 'dist', '--java-options', '-Dfile.encoding=UTF-8')
+          $options = @('--type', '${{ matrix.type }}', '--name', 'CatalogoLivros', '--app-version', '2.0.${{ github.run_number }}', '--input', 'target/package-input', '--main-jar', 'catalogo-livros.jar', '--dest', 'dist', '--java-options', '-Dfile.encoding=UTF-8', '--add-launcher', 'CatalogoServer=packaging/server-launcher.properties')
           if ($IsWindows) {
             $env:PATH += ";${env:WIX}bin"
             $options += @('--win-menu', '--win-shortcut', '--win-dir-chooser', '--win-per-user-install')
