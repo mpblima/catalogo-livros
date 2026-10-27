@@ -57,7 +57,7 @@ public final class CatalogoApp extends JFrame {
  final JButton update=new JButton("Catalogar livros digitais"),open=new JButton("Ler"),openFolderButton=new JButton("Abrir pasta do arquivo"),move=new JButton("Alterar categoria");
  static final java.util.prefs.Preferences preferences=java.util.prefs.Preferences.userNodeForPackage(CatalogoApp.class);
  static final String READER_PATH="externalReaderPath", READER_MODE="externalReaderEnabled";
- float fontScale=preferences.getFloat("fontScale",1.2f);
+ float fontScale=preferences.getFloat("fontScale",1.1f);
  final javax.swing.Timer autoSave;
  final javax.swing.Timer cloudSyncTimer;long lastCloudSync=0;boolean cloudSyncBusy=false;
  java.util.function.Consumer<Path> openFolder=this::external;
