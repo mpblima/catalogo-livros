@@ -14,14 +14,15 @@ import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.font.*;
 @EnabledIfSystemProperty(named="catalogo.guiTest",matches="true")
 class SwingIntegrationTest {
- @TempDir Path root;Biblioteca lib;CatalogoApp app;PdfReader reader;Path pdf;List<Exception> errors=new ArrayList<>();
+ @TempDir Path root;Biblioteca lib;CatalogoApp app;PdfReader reader;Path pdf;String oldCloudConfig;List<Exception> errors=new ArrayList<>();
  @BeforeEach void setup()throws Exception{
+  oldCloudConfig=System.getProperty("catalogo.cloud.config");System.setProperty("catalogo.cloud.config",root.resolve("cloud-config").toString());
   var f=new BibliotecaTest();f.root=root;f.setup();lib=f.library;pdf=root.resolve("programacao/java/livro.pdf");Files.createDirectories(pdf.getParent());
   try(var doc=new PDDocument()){for(int i=0;i<3;i++){var pg=new PDPage();doc.addPage(pg);try(var cs=new PDPageContentStream(doc,pg)){cs.beginText();cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),24);cs.newLineAtOffset(60,700);cs.showText("Pagina "+(i+1));cs.endText();}}doc.save(pdf.toFile());}
   BookPreview.ensureStored(lib,pdf);
   edt(()->{UiTheme.install();app=new CatalogoApp(lib,false);app.reportError=errors::add;app.setVisible(true);});settled();
  }
- @AfterEach void close()throws Exception{edt(()->{if(reader!=null)reader.dispatchEvent(new java.awt.event.WindowEvent(reader,java.awt.event.WindowEvent.WINDOW_CLOSING));if(app!=null){app.closed=true;app.searchDelay.stop();app.autoSave.stop();if(app.searchWorker!=null)app.searchWorker.cancel(false);app.dispose();}});}
+ @AfterEach void close()throws Exception{edt(()->{if(reader!=null)reader.dispatchEvent(new java.awt.event.WindowEvent(reader,java.awt.event.WindowEvent.WINDOW_CLOSING));if(app!=null){app.closed=true;app.searchDelay.stop();app.autoSave.stop();if(app.searchWorker!=null)app.searchWorker.cancel(false);app.dispose();}});if(oldCloudConfig==null)System.clearProperty("catalogo.cloud.config");else System.setProperty("catalogo.cloud.config",oldCloudConfig);}
  interface Action {void run()throws Exception;}
  void edt(Action action)throws Exception{var error=new AtomicReference<Throwable>();SwingUtilities.invokeAndWait(()->{try{action.run();}catch(Throwable e){error.set(e);}});if(error.get()!=null)throw new AssertionError(error.get());}
  void await(BooleanSupplier condition)throws Exception{long until=System.currentTimeMillis()+10000;while(System.currentTimeMillis()<until){boolean[] pass={false};edt(()->pass[0]=condition.getAsBoolean());if(pass[0])return;Thread.sleep(30);}fail("Tempo excedido; erros: "+errors);}
@@ -123,6 +124,12 @@ class SwingIntegrationTest {
   try(var c=lib.connect();var s=c.createStatement()){s.execute("INSERT INTO books VALUES('id2','programacao/java/livro.epub','Programação Java','livro.epub','programacao/java','EPUB','{}',1)");s.execute("INSERT INTO books VALUES('id3','programacao/java/amostra.pdf','Amostra Java','amostra.pdf','programacao/java','PDF','{}',1)");s.execute("INSERT INTO book_relations VALUES('id1','id2','same_work','teste')");s.execute("INSERT INTO book_relations VALUES('id3','id1','sample_of','teste')");}
   edt(()->app.filter());settled();edt(()->{assertEquals(1,app.model.getRowCount());assertEquals(3,app.versions.getItemCount());assertTrue(app.model.getValueAt(0,1).toString().contains("3 arquivos"));app.notes.setText("Nota do PDF");assertTrue(app.save());app.versions.setSelectedIndex(1);assertEquals("id2",app.selected.id);assertEquals("",app.notes.getText());app.notes.setText("Nota do EPUB");assertTrue(app.save());app.versions.setSelectedIndex(2);assertTrue(app.versionLabel(app.selected).contains("Amostra"));});
   var books=lib.books();assertEquals("Nota do PDF",books.stream().filter(b->b.id.equals("id1")).findFirst().get().notes);assertEquals("Nota do EPUB",books.stream().filter(b->b.id.equals("id2")).findFirst().get().notes);
+ }
+ @Test void sharedWebAnnotationsAppearInSelectedBookDetails()throws Exception{
+  var info=Biblioteca.JSON.createObjectNode();info.put("api","https://example.invalid");info.put("device_id","device");info.put("catalog_id","catalog");info.put("email","owner@example.invalid");info.put("token","test");info.put("database_id",app.cloudSync.databaseId);app.cloudSync.privateWrite(app.cloudSync.config,info.toString());String scope=app.cloudSync.scope(app.cloudSync.connection());String bookId=app.selected.id;
+  try(var c=lib.connect();var q=c.prepareStatement("INSERT INTO cloud_links(scope,local_id,cloud_id,base_version,base_hash,base_payload)VALUES(?,?,?,1,'hash','{}')")){q.setString(1,scope);q.setString(2,bookId);q.setString(3,"cloud-book");q.executeUpdate();}
+  try(var c=lib.connect();var q=c.prepareStatement("INSERT INTO cloud_comments(scope,id,cloud_book_id,body,author_name,author_email,origin,created_at)VALUES(?,?,?,?,?,?,?,?)")){q.setString(1,scope);q.setString(2,"comment-1");q.setString(3,"cloud-book");q.setString(4,"Texto escrito pela web");q.setString(5,"Leitora");q.setString(6,"reader@example.invalid");q.setString(7,"web");q.setString(8,"2026-10-27T12:00:00Z");q.executeUpdate();}
+  app.cloudSync.syncIntervalMinutes(0);edt(()->app.loadSharedNotes(app.selected));String visible=app.sharedNotes.getDocument().getText(0,app.sharedNotes.getDocument().getLength());assertTrue(visible.contains("Leitora"));assertTrue(visible.contains("Texto escrito pela web"));
  }
  @Test void pdfResumePreservesOtherWindowsNotes()throws Exception{
   var stored=lib.books().get(0);stored.page=2;lib.save(stored);var other=lib.books().get(0);other.notes="Anotação da outra janela";lib.save(other);

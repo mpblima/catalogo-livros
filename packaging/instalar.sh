@@ -28,6 +28,7 @@ done
 cp -a "$source_dir/catalogo" "$prefix/java"
 ln -s java/bin/catalogo "$prefix/catalogo"
 cp "$source_dir/catalogo.svg" "$prefix/catalogo.svg"
+cp "$source_dir/catalogo.png" "$prefix/catalogo.png"
 "$prefix/catalogo" --verify-ocr
 if $integrate; then
  mkdir -p "$HOME/.local/share/applications" "$HOME/.config/systemd/user"
@@ -39,13 +40,16 @@ Type=Application
 Name=Catálogo de Livros
 Comment=Biblioteca pessoal, leituras e anotações
 Exec="$prefix/catalogo"
-Icon=$prefix/catalogo.svg
+Icon=$prefix/catalogo.png
 Terminal=false
 Categories=Office;Education;
 StartupNotify=true
 DESKTOP
  chmod +x "$HOME/.local/share/applications/catalogo_livros.desktop"
- ln -sfn "$HOME/.local/share/applications/catalogo_livros.desktop" "$desktop/catalogo.desktop"
+ rm -f "$desktop/catalogo.desktop"
+ cp "$HOME/.local/share/applications/catalogo_livros.desktop" "$desktop/catalogo.desktop"
+ chmod +x "$desktop/catalogo.desktop"
+ if command -v gio >/dev/null 2>&1; then gio set "$desktop/catalogo.desktop" metadata::trusted true 2>/dev/null || true; fi
  cat > "$HOME/.config/systemd/user/catalogo_livros.service" <<SERVICE
 [Unit]
 Description=Catálogo local da biblioteca (Java)

@@ -12,9 +12,9 @@ mkdir -p "$work/input" "$work/image" "$work/payload" dist
 cp target/catalogo-livros.jar "$work/input/"
 "$jpackage_bin" --type app-image --name catalogo --app-version "$version" \
  --input "$work/input" --main-jar catalogo-livros.jar --dest "$work/image" \
- --java-options '-Dfile.encoding=UTF-8' --description 'Biblioteca pessoal Java/Swing'
+ --icon packaging/catalogo.png --java-options '-Dfile.encoding=UTF-8' --description 'Biblioteca pessoal Java/Swing'
 cp -a "$work/image/catalogo" "$work/payload/"
-cp packaging/instalar.sh packaging/catalogo.svg "$work/payload/"
+cp packaging/instalar.sh packaging/catalogo.svg packaging/catalogo.png "$work/payload/"
 tar -czf "$work/payload.tar.gz" -C "$work/payload" .
 installer="dist/catalogo-livros-${version}-linux-x86_64.run"
 cat > "$installer" <<'HEADER'
@@ -33,7 +33,7 @@ chmod +x "$installer"
 cp "$work/payload.tar.gz" "dist/catalogo-livros-${version}-linux-x86_64.tar.gz"
 # O .deb instala em /opt; o .run oferece instalação pessoal sem sudo.
 "$jpackage_bin" --type deb --name catalogo-livros --app-version "$version" \
- --app-image "$work/image/catalogo" --dest dist --linux-package-name catalogo-livros \
+ --app-image "$work/image/catalogo" --dest dist --icon packaging/catalogo.png --linux-package-name catalogo-livros \
  --linux-shortcut --linux-menu-group Office --vendor 'Catálogo de Livros' \
  --description 'Biblioteca pessoal Java/Swing com SQLite e OCR'
 (cd dist && sha256sum "catalogo-livros-${version}-linux-x86_64.run" "catalogo-livros-${version}-linux-x86_64.tar.gz" "catalogo-livros_${version}-1_amd64.deb" > "SHA256SUMS-${version}.txt")
