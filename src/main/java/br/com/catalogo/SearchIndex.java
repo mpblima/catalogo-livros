@@ -2,23 +2,23 @@ package br.com.catalogo;
 
 import java.sql.*;
 import java.util.*;
-import java.text.Normalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /** Índice persistente FTS5/trigramas; instr confirma correspondências literais parciais. */
 final class SearchIndex {
  static String normalize(String text){
-  var out=new StringBuilder();
-  Normalizer.normalize(text==null?"":text,Normalizer.Form.NFD).codePoints().filter(cp->Character.getType(cp)!=Character.NON_SPACING_MARK).forEach(cp->{if(Character.isLetterOrDigit(cp))out.appendCodePoint(Character.toLowerCase(cp));else out.append(' ');});
-  return out.toString().trim();
+  var out=new StringBuilder();String source="áàâãäåéèêëíìîïóòôõöúùûüçñ",target="aaaaaaeeeeiiiiooooouuuucn";String value=Objects.toString(text,"").toLowerCase(Locale.ROOT);
+  value.codePoints().forEach(cp->{int index=source.indexOf(cp);out.appendCodePoint(index<0?cp:target.charAt(index));});
+  return out.toString();
  }
- static List<String> terms(String text){return Collections.list(new StringTokenizer(normalize(text))).stream().map(Object::toString).distinct().toList();}
+ static List<String> terms(String text){var out=new ArrayList<String>();var term=new StringBuilder();normalize(text).codePoints().forEach(cp->{if(Character.isWhitespace(cp)||Character.isSpaceChar(cp)){if(!term.isEmpty()){out.add(term.toString());term.setLength(0);}}else term.appendCodePoint(cp);});if(!term.isEmpty())out.add(term.toString());return out.stream().distinct().toList();}
  static void initialize(Biblioteca library)throws SQLException {
   try(var c=library.connect();var s=c.createStatement()){
    c.setAutoCommit(false);
    try {
     s.execute("CREATE TABLE IF NOT EXISTS search_documents(rowid INTEGER PRIMARY KEY,book_id TEXT UNIQUE NOT NULL,content TEXT NOT NULL)");
     s.execute("CREATE TABLE IF NOT EXISTS search_dirty(book_id TEXT PRIMARY KEY)");
+    s.execute("CREATE TABLE IF NOT EXISTS search_index_state(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL)");
     s.execute("CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(content,content='search_documents',content_rowid='rowid',tokenize='trigram')");
     s.execute("CREATE TRIGGER IF NOT EXISTS search_documents_ai AFTER INSERT ON search_documents BEGIN INSERT INTO search_fts(rowid,content) VALUES(new.rowid,new.content); END");
     s.execute("CREATE TRIGGER IF NOT EXISTS search_documents_ad AFTER DELETE ON search_documents BEGIN INSERT INTO search_fts(search_fts,rowid,content) VALUES('delete',old.rowid,old.content); END");
@@ -32,8 +32,11 @@ final class SearchIndex {
      s.execute("DROP TRIGGER IF EXISTS search_categories_"+event);
      s.execute("CREATE TRIGGER search_categories_"+event+" AFTER "+event+" ON categories BEGIN INSERT INTO search_dirty SELECT id FROM books WHERE NOT EXISTS(SELECT 1 FROM search_dirty WHERE book_id=books.id); END");
     }
+    s.execute("DROP TRIGGER IF EXISTS search_previews_insert");s.execute("CREATE TRIGGER search_previews_insert AFTER INSERT ON book_previews BEGIN INSERT INTO search_dirty SELECT new.book_id WHERE NOT EXISTS(SELECT 1 FROM search_dirty WHERE book_id=new.book_id); END");
+    s.execute("DROP TRIGGER IF EXISTS search_previews_update");s.execute("CREATE TRIGGER search_previews_update AFTER UPDATE ON book_previews BEGIN INSERT INTO search_dirty SELECT new.book_id WHERE NOT EXISTS(SELECT 1 FROM search_dirty WHERE book_id=new.book_id); END");
     s.execute("INSERT OR IGNORE INTO search_dirty SELECT id FROM books WHERE id NOT IN (SELECT book_id FROM search_documents)");
     s.execute("INSERT OR IGNORE INTO search_dirty SELECT book_id FROM search_documents WHERE book_id NOT IN (SELECT id FROM books WHERE active=1)");
+    int searchVersion=0;try(var r=s.executeQuery("SELECT version FROM search_index_state WHERE singleton=1")){if(r.next())searchVersion=r.getInt(1);}if(searchVersion!=2){s.execute("INSERT OR IGNORE INTO search_dirty SELECT id FROM books WHERE active=1");s.execute("INSERT INTO search_index_state(singleton,version)VALUES(1,2)ON CONFLICT(singleton)DO UPDATE SET version=excluded.version");}
     c.commit();
    }catch(SQLException e){c.rollback();throw e;}
   }
@@ -48,13 +51,11 @@ final class SearchIndex {
     // Reservar a escrita antes de ler evita SQLITE_BUSY_SNAPSHOT com a atualização em paralelo.
     var ids=new ArrayList<String>();try(var r=s.executeQuery("SELECT book_id FROM search_dirty")){while(r.next())ids.add(r.getString(1));}
     if(ids.isEmpty()){s.execute("COMMIT");return;}
-    var labels=new HashMap<String,String>();try(var r=s.executeQuery("SELECT * FROM categories")){var cols=new HashSet<String>();for(int i=1;i<=r.getMetaData().getColumnCount();i++)cols.add(r.getMetaData().getColumnName(i));while(r.next())labels.put(r.getString("path"),cols.contains("name")?r.getString("name"):r.getString("path"));}
-    try(var get=c.prepareStatement("SELECT b.*,m.notes,m.location FROM books b LEFT JOIN marks m ON b.id=m.book_id WHERE b.id=? AND b.active=1");var put=c.prepareStatement("INSERT INTO search_documents(book_id,content) VALUES(?,?) ON CONFLICT(book_id) DO UPDATE SET content=excluded.content");var del=c.prepareStatement("DELETE FROM search_documents WHERE book_id=?");var done=c.prepareStatement("DELETE FROM search_dirty WHERE book_id=?")){
+    try(var get=c.prepareStatement("SELECT b.*,p.summary FROM books b LEFT JOIN book_previews p ON b.id=p.book_id WHERE b.id=? AND b.active=1");var put=c.prepareStatement("INSERT INTO search_documents(book_id,content) VALUES(?,?) ON CONFLICT(book_id) DO UPDATE SET content=excluded.content");var del=c.prepareStatement("DELETE FROM search_documents WHERE book_id=?");var done=c.prepareStatement("DELETE FROM search_dirty WHERE book_id=?")){
      for(String id:ids){
       get.setString(1,id);try(var r=get.executeQuery()){
        if(r.next()){
-        var text=new StringBuilder();for(String key:List.of("title","filename","path","section","notes","location"))text.append(' ').append(Objects.toString(r.getString(key),""));
-        String section=r.getString("section");for(var entry:labels.entrySet())if(section.equals(entry.getKey())||section.startsWith(entry.getKey()+"/"))text.append(' ').append(entry.getValue());
+        var text=new StringBuilder();for(String key:List.of("title","filename","path","section","summary"))text.append(' ').append(Objects.toString(r.getString(key),""));
         try{appendValues(Biblioteca.JSON.readTree(r.getString("metadata_json")),text);}catch(Exception ignored){}
         put.setString(1,id);put.setString(2,normalize(text.toString()));put.executeUpdate();
        }else{del.setString(1,id);del.executeUpdate();}
