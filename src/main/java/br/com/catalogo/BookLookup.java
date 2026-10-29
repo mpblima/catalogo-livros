@@ -34,13 +34,13 @@ final class BookLookup {
   if(d!=null&&!ean.isBlank())d.isbn="";
   if(d==null)try{stage(20,"Pesquisando dados no Google Books…");var items=json(google+"/volumes?q=isbn:"+isbn+"&maxResults=5").path("items");for(var item:items){var info=item.path("volumeInfo");boolean exact=false;for(var identifier:info.path("industryIdentifiers")){String candidate=identifier.path("identifier").asText();if(!ean.isBlank()?candidate.replaceAll("\\D","").equals(ean):matchesIsbn(candidate,isbn))exact=true;}if(exact&&!info.path("title").asText().isBlank()){d=google(info,storedIsbn,images);break;}}}catch(Exception e){failure=e;}
   if(d==null)try{stage(25,"Consultando a página do livro…");var g=googlePage(isbn);if(!g.title.isBlank()){d=g;if(!ean.isBlank())d.isbn="";if(images)d.cover=firstCover(d.coverUrls);}}catch(Exception ignored){}
-  if(d==null&&!ean.isBlank())try{stage(30,"Consultando catálogo brasileiro…");d=findRetailer(ean);}catch(Exception ignored){}
+  if(d==null&&!ean.isBlank())try{stage(30,"Consultando catálogo brasileiro…");d=findRetailer(ean,images);}catch(Exception ignored){}
   if(d==null){if(!ean.isBlank())throw new IllegalArgumentException("Livro não encontrado para este código. Você pode preencher o formulário manualmente.");if(failure!=null)throw new IOException("Não foi possível consultar o livro agora. Preencha os dados manualmente ou tente novamente.",failure);throw new IllegalArgumentException("Livro não encontrado para este ISBN. Você pode preencher o formulário manualmente.");}
   d.barcode=barcode.strip();return d;
  }
  private static boolean matchesIsbn(String candidate,String expected){try{return PhysicalBooks.isbn(candidate).equals(expected);}catch(IllegalArgumentException ignored){return false;}}
  private static String ean(String value){String code=value.replaceAll("\\D","");if(!code.matches("789[0-9]{10}"))throw new IllegalArgumentException("Código não reconhecido como ISBN ou código de barras brasileiro.");return code;}
- private PhysicalBooks.Draft findRetailer(String ean){
+ private PhysicalBooks.Draft findRetailer(String ean,boolean images){
   String search="https://www.livrarialoyola.com.br/busca?busca="+ean;
   try{String results=new String(get(search,2_000_000),java.nio.charset.StandardCharsets.UTF_8);
    for(String page:WebCoverSearch.links(results,search,""))try{
