@@ -24,7 +24,7 @@ Também são distribuídos um `.deb` para instalação no sistema e um `.tar.gz`
 - **Favorito / Em leitura:** mantém as escolhas no SQLite. A tela permite retomar as leituras.
 - **Anotações:** salvamento automático; alterações de outra janela são protegidas contra sobrescrita silenciosa.
 - **Acervos:** a árvore tem as categorias principais Livros digitais e Livros físicos. O acervo existente e seus assuntos ficam em Livros digitais; Livros físicos recebe os cadastros manuais ou por código de barras. Essa hierarquia é mantida no banco, preservando os caminhos dos arquivos e as marcações. A catalogação automática atua somente no acervo digital.
-- **Novo livro físico:** formulário com código de barras opcional e foco inicial para leitores USB/Bluetooth em modo teclado. Um ISBN válido inicia a consulta automática (Enter também funciona); Open Library e, como alternativa, Google Books fornecem os dados disponíveis e os links de capa. O livro é salvo numa categoria física criada pelo classificador, a confirmação aparece e o formulário limpa e retorna ao código. A tela agrupa os dados em duas colunas, com capa e localização na lateral e aba de resumo/anotações. Sem consulta disponível, é possível cadastrar manualmente, inclusive capa, resumo, localização, anotações e estado de leitura. ISBN/código repetido não cria outro registro físico. A busca geral encontra os dois acervos. A consulta requer internet; cadastro manual e pesquisa local funcionam sem ela.
+- **Novo livro físico:** formulário com código de barras opcional e foco inicial para leitores USB/Bluetooth em modo teclado. Um ISBN válido inicia a consulta automática (Enter também funciona); Open Library e Google Books são consultados primeiro, com catálogo brasileiro como alternativa para códigos EAN. O livro é salvo numa categoria física criada pelo classificador, a confirmação aparece e o formulário limpa e retorna ao código. A tela agrupa os dados em duas colunas, com capa e localização na lateral e aba de resumo/anotações. Sem consulta disponível, é possível cadastrar manualmente, inclusive capa, resumo, localização, anotações e estado de leitura. ISBN/código repetido não cria outro registro físico. A busca geral encontra os dois acervos. A consulta requer internet; cadastro manual e pesquisa local funcionam sem ela.
 - **Capas, informações e resumos em segundo plano:** o cadastro enfileira a busca da imagem e o preenchimento dos dados bibliográficos e do resumo ausentes sem bloquear os próximos livros. A fila fica no SQLite, permite uma pesquisa por vez por biblioteca, usa Google Books (incluindo Dynamic Links), Open Library e fontes alternativas por ISBN e agenda novas tentativas após falhas. Reabre com a aplicação ou continua no serviço local. Capas existentes são preservadas; a prévia atualiza sozinha quando a imagem chega. Definir capa permite selecionar uma imagem manualmente. O diálogo de cadastro tem Fechar, inclusive durante a consulta de metadados.
 - **Excluir cadastro:** exige confirmação para o livro selecionado e remove suas marcações, prévia e buscas pendentes. Para digitais, mantém o arquivo no disco e registra a exclusão para que o próximo catálogo não o adicione novamente no mesmo caminho.
 - **Catalogar livros digitais:** procura documentos soltos na raiz de Livros, extrai título e metadados, cria categorias automaticamente, renomeia em snake_case e move para o assunto correspondente. Atualiza agrupamentos, SQLite, índice e HTML, com barra de progresso. Também ocorre em segundo plano ao iniciar.
@@ -87,12 +87,11 @@ Para livros físicos, personalize a categoria na árvore; **Nova categoria / sub
 cria um nível dentro do nó selecionado, persistido ao salvar o livro.
 
 A leitura do ISBN preenche o formulário sem gravar. **Salvar alterações** é a
-única ação que cadastra ou atualiza o livro físico. Após salvar, o formulário
-permanece no mesmo livro; salvar novamente atualiza esse cadastro.
-**Cadastrar novo livro** limpa os campos e descarta alterações pendentes, sem
-gravação, inclusive cancelando uma consulta em andamento. Não há cadastro
-automático. Anotações e progresso dos físicos na tela principal também exigem
-**Salvar alterações**.
+única ação que cadastra ou atualiza o livro físico. Após salvar uma edição, o
+formulário limpa e fica pronto para outro cadastro. **Cadastrar novo livro**
+também limpa os campos e descarta alterações pendentes, sem gravação, inclusive
+cancelando uma consulta em andamento. Não há cadastro automático. Anotações e
+progresso dos físicos na tela principal também exigem **Salvar alterações**.
 A consulta por ISBN busca automaticamente os dados e a capa, tentando fontes
 alternativas quando necessário, incluindo páginas de livrarias com o ISBN da
 edição confirmado. Durante a consulta, uma barra animada mostra a etapa em

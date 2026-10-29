@@ -27,12 +27,32 @@ final class BookLookup {
  }
  PhysicalBooks.Draft findMetadata(String barcode)throws Exception{return find(barcode,false);}
  private PhysicalBooks.Draft find(String barcode,boolean images)throws Exception{
-  String isbn=PhysicalBooks.isbn(barcode);PhysicalBooks.Draft d=null;Exception failure=null;
+  String isbn,ean="";try{isbn=PhysicalBooks.isbn(barcode);}catch(IllegalArgumentException invalidIsbn){ean=ean(barcode);isbn=ean;}
+  String storedIsbn=ean.isBlank()?isbn:"";
+  PhysicalBooks.Draft d=null;Exception failure=null;
   stage(10,"Pesquisando dados na Open Library…");try{var item=json(openLibrary+"/api/books?bibkeys=ISBN:"+isbn+"&jscmd=data&format=json").path("ISBN:"+isbn);if(!item.path("title").asText().isBlank())d=open(item,isbn,images);}catch(Exception e){failure=e;}
-  if(d==null)try{stage(20,"Pesquisando dados no Google Books…");var items=json(google+"/volumes?q=isbn:"+isbn+"&maxResults=5").path("items");for(var item:items){var info=item.path("volumeInfo");boolean exact=false;for(var identifier:info.path("industryIdentifiers"))try{if(PhysicalBooks.isbn(identifier.path("identifier").asText()).equals(isbn))exact=true;}catch(IllegalArgumentException ignored){}if(exact&&!info.path("title").asText().isBlank()){d=google(info,isbn,images);break;}}}catch(Exception e){failure=e;}
-  if(d==null)try{stage(25,"Consultando a página do livro…");var g=googlePage(isbn);if(!g.title.isBlank()){d=g;if(images)d.cover=firstCover(d.coverUrls);}}catch(Exception ignored){}
-  if(d==null){if(failure!=null)throw new IOException("Não foi possível consultar o livro agora. Preencha os dados manualmente ou tente novamente.",failure);throw new IllegalArgumentException("Livro não encontrado para este ISBN. Você pode preencher o formulário manualmente.");}
+  if(d!=null&&!ean.isBlank())d.isbn="";
+  if(d==null)try{stage(20,"Pesquisando dados no Google Books…");var items=json(google+"/volumes?q=isbn:"+isbn+"&maxResults=5").path("items");for(var item:items){var info=item.path("volumeInfo");boolean exact=false;for(var identifier:info.path("industryIdentifiers")){String candidate=identifier.path("identifier").asText();if(!ean.isBlank()?candidate.replaceAll("\\D","").equals(ean):matchesIsbn(candidate,isbn))exact=true;}if(exact&&!info.path("title").asText().isBlank()){d=google(info,storedIsbn,images);break;}}}catch(Exception e){failure=e;}
+  if(d==null)try{stage(25,"Consultando a página do livro…");var g=googlePage(isbn);if(!g.title.isBlank()){d=g;if(!ean.isBlank())d.isbn="";if(images)d.cover=firstCover(d.coverUrls);}}catch(Exception ignored){}
+  if(d==null&&!ean.isBlank())try{stage(30,"Consultando catálogo brasileiro…");d=findRetailer(ean);}catch(Exception ignored){}
+  if(d==null){if(!ean.isBlank())throw new IllegalArgumentException("Livro não encontrado para este código. Você pode preencher o formulário manualmente.");if(failure!=null)throw new IOException("Não foi possível consultar o livro agora. Preencha os dados manualmente ou tente novamente.",failure);throw new IllegalArgumentException("Livro não encontrado para este ISBN. Você pode preencher o formulário manualmente.");}
   d.barcode=barcode.strip();return d;
+ }
+ private static boolean matchesIsbn(String candidate,String expected){try{return PhysicalBooks.isbn(candidate).equals(expected);}catch(IllegalArgumentException ignored){return false;}}
+ private static String ean(String value){String code=value.replaceAll("\\D","");if(!code.matches("789[0-9]{10}"))throw new IllegalArgumentException("Código não reconhecido como ISBN ou código de barras brasileiro.");return code;}
+ private PhysicalBooks.Draft findRetailer(String ean){
+  String search="https://www.livrarialoyola.com.br/busca?busca="+ean;
+  try{String results=new String(get(search,2_000_000),java.nio.charset.StandardCharsets.UTF_8);
+   for(String page:WebCoverSearch.links(results,search,""))try{
+    String html=new String(get(page,2_000_000),java.nio.charset.StandardCharsets.UTF_8);
+    if(!java.util.regex.Pattern.compile("(?is)(?:isbn(?:-1[03])?|gtin1[34])\\s*[:=\\\" ]{0,30}[^0-9]{0,30}"+ean+"(?![0-9])|attribute-value=[\\\"']"+ean+"[\\\"']").matcher(html).find())continue;
+    var draft=new PhysicalBooks.Draft();draft.barcode=ean;draft.source="Livraria Loyola (edição identificada pelo EAN)";
+    var title=java.util.regex.Pattern.compile("(?is)<meta\\s+property=[\\\"']?og:title[\\\"']?\\s+content=[\\\"']([^\\\"']+)").matcher(html);
+    if(title.find())draft.title=title.group(1).replaceAll("(?i)\\s*[-|]\\s*Livraria Loyola.*$","").replaceAll("\\s+"," ").strip();
+    String image=WebCoverSearch.image(html,page,ean);if(!image.isBlank())draft.coverUrls.add(image);
+    if(images)draft.cover=firstCover(draft.coverUrls);return draft;
+   }catch(Exception ignored){}
+  }catch(Exception ignored){}return null;
  }
  PhysicalBooks.Draft findDetails(String rawIsbn,String title,String author)throws Exception{
   PhysicalBooks.Draft d;
