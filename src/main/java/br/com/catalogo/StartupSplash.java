@@ -10,7 +10,7 @@ final class StartupSplash extends JWindow {
  StartupSplash(){
   setSize(560,330);setLocationRelativeTo(null);setAlwaysOnTop(true);
   var canvas=new JPanel(new BorderLayout(0,22)){
-   protected void paintComponent(Graphics graphics){super.paintComponent(graphics);var g=(Graphics2D)graphics.create();g.setPaint(new GradientPaint(0,0,new Color(74,27,12),560,330,UiTheme.BACKGROUND));g.fillRect(0,0,getWidth(),getHeight());g.setColor(new Color(153,60,29,65));g.setStroke(new BasicStroke(1));for(int i=0;i<4;i++)g.draw(new Ellipse2D.Float(360+i*28,-120+i*20,330,330));g.dispose();}
+   protected void paintComponent(Graphics graphics){super.paintComponent(graphics);var g=(Graphics2D)graphics.create();g.setPaint(new GradientPaint(0,0,UiTheme.BACKGROUND,560,330,UiTheme.SURFACE));g.fillRect(0,0,getWidth(),getHeight());g.setColor(new Color(245,196,179,110));g.setStroke(new BasicStroke(1));for(int i=0;i<4;i++)g.draw(new Ellipse2D.Float(360+i*28,-120+i*20,330,330));g.dispose();}
   };
   canvas.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(UiTheme.LINE),BorderFactory.createEmptyBorder(35,38,30,38)));setContentPane(canvas);
   var heading=UiTheme.panel(new BorderLayout(18,0));heading.add(new JLabel(new UiTheme.BookIcon(66)),BorderLayout.WEST);var names=UiTheme.panel(new GridLayout(2,1,0,5));names.add(UiTheme.eyebrow("CATÁLOGO DE LIVROS"));var title=new JLabel("Biblioteca");title.setForeground(UiTheme.TEXT);title.setFont(new Font("Arial",Font.BOLD,38));names.add(title);heading.add(names);canvas.add(heading,BorderLayout.NORTH);

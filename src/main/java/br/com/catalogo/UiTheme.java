@@ -1,6 +1,6 @@
 package br.com.catalogo;
 
-import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
@@ -8,9 +8,9 @@ import java.awt.geom.*;
 
 /** Paleta e componentes visuais compartilhados pela janela e pela abertura. */
 final class UiTheme {
- static final Color BACKGROUND=new Color(74,27,12),SURFACE=new Color(82,36,21),RAISED=new Color(98,45,25),LINE=new Color(153,60,29),TEXT=new Color(250,236,231),MUTED=new Color(240,153,123),ACCENT=new Color(216,90,48),SELECTED=new Color(110,48,27);
+ static final Color BACKGROUND=new Color(250,236,231),SURFACE=new Color(252,247,243),RAISED=new Color(250,236,231),LINE=new Color(245,196,179),TEXT=new Color(74,27,12),MUTED=new Color(128,98,83),ACCENT=new Color(128,81,63),SELECTED=new Color(250,236,231);
  static void install(){
-  FlatDarkLaf.setup();
+  FlatLightLaf.setup();
   UIManager.put("defaultFont",new Font("Arial",Font.PLAIN,14));
   for(String key:new String[]{"Panel.background","Viewport.background","ScrollPane.background","SplitPane.background","Tree.background","Table.background","TabbedPane.background"})UIManager.put(key,SURFACE);
   UIManager.put("control",SURFACE);UIManager.put("text",TEXT);
@@ -30,7 +30,7 @@ final class UiTheme {
  static JLabel eyebrow(String text){var l=new JLabel(text);l.setForeground(MUTED);l.setFont(l.getFont().deriveFont(Font.BOLD,11));return l;}
  static Border card(){return BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LINE),BorderFactory.createEmptyBorder(16,18,16,18));}
  static JScrollPane scroll(Component component){var scroll=new JScrollPane(component);scroll.setBorder(BorderFactory.createEmptyBorder());scroll.getVerticalScrollBar().setUnitIncrement(24);return scroll;}
- static void primary(JButton button){button.setBackground(ACCENT);button.setForeground(Color.WHITE);button.setFont(button.getFont().deriveFont(Font.BOLD));}
+ static void primary(JButton button){button.setBackground(new Color(153,60,29));button.setForeground(Color.WHITE);button.setFont(button.getFont().deriveFont(Font.BOLD));}
  static Image appIcon(){try(var in=UiTheme.class.getResourceAsStream("/catalogo/praesens-avatar.png")){return javax.imageio.ImageIO.read(in);}catch(Exception e){var im=new java.awt.image.BufferedImage(128,128,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=im.createGraphics();new BookIcon(128).paintIcon(null,g,0,0);g.dispose();return im;}}
  static final class BookIcon implements Icon {
   final int size;BookIcon(int size){this.size=size;}public int getIconWidth(){return size;}public int getIconHeight(){return size;}
