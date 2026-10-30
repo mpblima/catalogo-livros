@@ -8,10 +8,10 @@ import java.awt.geom.*;
 
 /** Paleta e componentes visuais compartilhados pela janela e pela abertura. */
 final class UiTheme {
- static final Color BACKGROUND=new Color(16,23,25),SURFACE=new Color(24,33,35),RAISED=new Color(31,43,45),LINE=new Color(47,64,64),TEXT=new Color(230,239,233),MUTED=new Color(151,173,164),ACCENT=new Color(155,215,182),SELECTED=new Color(38,68,57);
+ static final Color BACKGROUND=new Color(74,27,12),SURFACE=new Color(82,36,21),RAISED=new Color(98,45,25),LINE=new Color(153,60,29),TEXT=new Color(250,236,231),MUTED=new Color(240,153,123),ACCENT=new Color(216,90,48),SELECTED=new Color(110,48,27);
  static void install(){
   FlatDarkLaf.setup();
-  UIManager.put("defaultFont",new Font("SansSerif",Font.PLAIN,14));
+  UIManager.put("defaultFont",new Font("Arial",Font.PLAIN,14));
   for(String key:new String[]{"Panel.background","Viewport.background","ScrollPane.background","SplitPane.background","Tree.background","Table.background","TabbedPane.background"})UIManager.put(key,SURFACE);
   UIManager.put("control",SURFACE);UIManager.put("text",TEXT);
   for(String key:new String[]{"Label.foreground","Table.foreground","Tree.foreground","TextArea.foreground","TextField.foreground","CheckBox.foreground"})UIManager.put(key,TEXT);
@@ -30,10 +30,10 @@ final class UiTheme {
  static JLabel eyebrow(String text){var l=new JLabel(text);l.setForeground(MUTED);l.setFont(l.getFont().deriveFont(Font.BOLD,11));return l;}
  static Border card(){return BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LINE),BorderFactory.createEmptyBorder(16,18,16,18));}
  static JScrollPane scroll(Component component){var scroll=new JScrollPane(component);scroll.setBorder(BorderFactory.createEmptyBorder());scroll.getVerticalScrollBar().setUnitIncrement(24);return scroll;}
- static void primary(JButton button){button.setBackground(ACCENT);button.setForeground(new Color(18,42,29));button.setFont(button.getFont().deriveFont(Font.BOLD));}
- static Image appIcon(){var im=new java.awt.image.BufferedImage(128,128,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=im.createGraphics();new BookIcon(128).paintIcon(null,g,0,0);g.dispose();return im;}
+ static void primary(JButton button){button.setBackground(ACCENT);button.setForeground(Color.WHITE);button.setFont(button.getFont().deriveFont(Font.BOLD));}
+ static Image appIcon(){try(var in=UiTheme.class.getResourceAsStream("/catalogo/praesens-avatar.png")){return javax.imageio.ImageIO.read(in);}catch(Exception e){var im=new java.awt.image.BufferedImage(128,128,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=im.createGraphics();new BookIcon(128).paintIcon(null,g,0,0);g.dispose();return im;}}
  static final class BookIcon implements Icon {
   final int size;BookIcon(int size){this.size=size;}public int getIconWidth(){return size;}public int getIconHeight(){return size;}
-  public void paintIcon(Component c,Graphics graphics,int x,int y){var g=(Graphics2D)graphics.create();g.translate(x,y);g.scale(size/64.0,size/64.0);g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);g.setColor(new Color(37,63,52));g.fillRoundRect(0,0,64,64,18,18);g.setColor(ACCENT);g.setStroke(new BasicStroke(2.2f,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));var left=new Path2D.Float();left.moveTo(32,46);left.curveTo(25,41,19,41,12,42);left.lineTo(12,19);left.curveTo(20,17,26,19,32,23);left.curveTo(38,19,44,17,52,19);left.lineTo(52,42);left.curveTo(44,41,39,41,32,46);g.draw(left);g.drawLine(32,23,32,46);g.setColor(new Color(126,170,146));g.drawLine(18,26,25,28);g.drawLine(18,32,25,34);g.drawLine(39,28,46,26);g.drawLine(39,34,46,32);g.dispose();}
+  public void paintIcon(Component c,Graphics graphics,int x,int y){var g=(Graphics2D)graphics.create();g.translate(x,y);g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);try(var in=UiTheme.class.getResourceAsStream("/catalogo/praesens-simbolo.png")){var symbol=javax.imageio.ImageIO.read(in);g.drawImage(symbol,0,0,size,size,null);}catch(Exception ignored){}g.dispose();}
  }
 }
