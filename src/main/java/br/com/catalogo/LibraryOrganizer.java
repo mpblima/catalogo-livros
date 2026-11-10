@@ -27,7 +27,7 @@ final class LibraryOrganizer {
   int moved=0,duplicates=0;var skipped=new ArrayList<String>();var changes=new ArrayList<Map<String,Object>>();
   Map<String,Map<String,Object>> cache=cache();
   try(var extractor=new DocumentExtractor()){
-  List<Path> loose=new ArrayList<>();for(Path candidate:paths())if(!known(candidate))loose.add(candidate);
+  List<Path> loose=new ArrayList<>();for(Path candidate:files(false))if(!known(candidate))loose.add(candidate);
    for(int i=0;i<loose.size();i++){Path file=loose.get(i);if(lib.excluded(relative(file)))continue;progress.update(i*35/Math.max(1,loose.size()),"Lendo documento: "+file.getFileName());if(!DocumentExtractor.recognizable(file)){skipped.add(file.getFileName()+": não é um PDF/EPUB legível");continue;}
     try{
      var extracted=extractor.extract(file,relative(file));String folder=classifier.destination(extracted.title(),file.getFileName().toString(),extracted.metadata());String hash=sha256(file);String duplicate=null;
@@ -54,7 +54,12 @@ final class LibraryOrganizer {
    var directory=safe(LibraryCategories.disk(category));Files.createDirectories(directory);Path destination=unique(directory.resolve(CategoryClassifier.snake(title)+suffix(source)));String target=relative(destination);if(!source.equals(destination))relocateFile(source,destination,"manual_register",sha256(source),cache,true);saveCache(cache);BookGrouper.refresh(lib);lib.refreshSearchIndex();new HtmlCatalog(lib).export();return target;
   }
  });}
- private List<Path> paths()throws Exception{var result=new ArrayList<Path>();Files.walkFileTree(lib.root,documentVisitor(result));var excluded=new HashSet<String>();try(var c=lib.connect();var s=c.createStatement();var rows=s.executeQuery("SELECT path FROM excluded_documents")){while(rows.next())excluded.add(rows.getString(1));}result.removeIf(p->excluded.contains(relative(p)));result.sort(Comparator.naturalOrder());return result;}
+ private List<Path> paths()throws Exception{return files(true);}
+ private List<Path> files(boolean recognizableOnly)throws Exception{var result=new ArrayList<Path>();Files.walkFileTree(lib.root,new SimpleFileVisitor<>(){
+  public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attrs){String n=dir.getFileName().toString();return !dir.equals(lib.root)&&(n.equals("organizacao")||n.equals(LibraryCategories.PHYSICAL)||n.startsWith(".")||n.contains("wso2is_analytics"))?FileVisitResult.SKIP_SUBTREE:FileVisitResult.CONTINUE;}
+  public FileVisitResult visitFile(Path file,BasicFileAttributes attrs){if(attrs.isRegularFile()&&extension(file)&&(!recognizableOnly||DocumentExtractor.recognizable(file)))result.add(file);return FileVisitResult.CONTINUE;}
+  public FileVisitResult visitFileFailed(Path file,IOException error)throws IOException{if(error instanceof NoSuchFileException)return FileVisitResult.CONTINUE;throw error;}
+ });var excluded=new HashSet<String>();try(var c=lib.connect();var s=c.createStatement();var rows=s.executeQuery("SELECT path FROM excluded_documents")){while(rows.next())excluded.add(rows.getString(1));}result.removeIf(p->excluded.contains(relative(p)));result.sort(Comparator.naturalOrder());return result;}
  SimpleFileVisitor<Path> documentVisitor(List<Path> result){return new SimpleFileVisitor<>(){
   public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attrs){String n=dir.getFileName().toString();return !dir.equals(lib.root)&&(n.equals("organizacao")||n.equals(LibraryCategories.PHYSICAL)||n.startsWith(".")||n.contains("wso2is_analytics"))?FileVisitResult.SKIP_SUBTREE:FileVisitResult.CONTINUE;}
   public FileVisitResult visitFile(Path file,BasicFileAttributes attrs){if(attrs.isRegularFile()&&extension(file)&&DocumentExtractor.recognizable(file))result.add(file);return FileVisitResult.CONTINUE;}
