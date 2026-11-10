@@ -27,7 +27,7 @@ final class LibraryOrganizer {
   int moved=0,duplicates=0;var skipped=new ArrayList<String>();var changes=new ArrayList<Map<String,Object>>();
   Map<String,Map<String,Object>> cache=cache();
   try(var extractor=new DocumentExtractor()){
-   List<Path> loose;try(var stream=Files.list(lib.root)){loose=stream.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)&&extension(p)).sorted().toList();}
+  List<Path> loose=new ArrayList<>();for(Path candidate:paths())if(!known(candidate))loose.add(candidate);
    for(int i=0;i<loose.size();i++){Path file=loose.get(i);if(lib.excluded(relative(file)))continue;progress.update(i*35/Math.max(1,loose.size()),"Lendo documento: "+file.getFileName());if(!DocumentExtractor.recognizable(file)){skipped.add(file.getFileName()+": não é um PDF/EPUB legível");continue;}
     try{
      var extracted=extractor.extract(file,relative(file));String folder=classifier.destination(extracted.title(),file.getFileName().toString(),extracted.metadata());String hash=sha256(file);String duplicate=null;
@@ -41,6 +41,17 @@ final class LibraryOrganizer {
    try(var c=lib.connect();var q=c.prepareStatement("UPDATE books SET active=0 WHERE id=?");var s=c.createStatement();var rows=s.executeQuery("SELECT id,path FROM books WHERE active=1 AND section NOT LIKE 'livros_fisicos%' AND CASE WHEN json_valid(metadata_json) THEN COALESCE(json_extract(metadata_json,'$._cloud_missing'),0) ELSE 0 END=0")){while(rows.next())if(!present.contains(rows.getString(2))){q.setString(1,rows.getString(1));q.addBatch();}q.executeBatch();}
    progress.update(86,"Conferindo nomes e categorias");correctMismatches(cache);saveCache(cache);progress.update(90,"Agrupando formatos e amostras");int relations=BookGrouper.refresh(lib);progress.update(95,"Atualizando índice de pesquisa");lib.refreshSearchIndex();progress.update(98,"Atualizando catálogo HTML");new HtmlCatalog(lib).export();progress.update(100,"Catálogo e índice atualizados");
    var result=new LinkedHashMap<String,Object>();result.put("moved",moved);result.put("duplicates",duplicates);result.put("files",changes);result.put("skipped",skipped);result.put("total",lib.books().size());result.put("relations",relations);result.put("unclassified",lib.books().stream().filter(b->b.section.equals(LibraryCategories.digital("a_classificar"))).count());return result;
+  }
+ });}
+ private boolean known(Path file)throws Exception{try(var c=lib.connect();var q=c.prepareStatement("SELECT 1 FROM books WHERE path=? AND active=1")){q.setString(1,relative(file));try(var r=q.executeQuery()){return r.next();}}}
+ boolean hasUncatalogued()throws Exception{for(Path path:paths())if(!known(path))return true;return false;}
+ String registerDigital(Path file,String title,String author,String category)throws Exception{return locked((p,m)->{},()->{
+  Path source=file.toAbsolutePath().normalize();if(!source.startsWith(lib.root)||!Files.isRegularFile(source)||!extension(source)||!DocumentExtractor.recognizable(source))throw new IOException("Escolha um PDF ou EPUB legível dentro da pasta da biblioteca.");
+  if(category==null||!category.startsWith(LibraryCategories.DIGITAL))throw new IllegalArgumentException("Escolha uma categoria de Livros digitais.");
+  var cache=cache();try(var extractor=new DocumentExtractor()){
+   var extracted=extractor.extract(source,relative(source));indexOne(source,extracted,cache,extractor);
+   try(var c=lib.connect();var q=c.prepareStatement("UPDATE books SET title=?,title_source='manual',metadata_json=json_set(metadata_json,'$.author',?) WHERE path=? AND active=1")){q.setString(1,title.strip());q.setString(2,author.strip());q.setString(3,relative(source));q.executeUpdate();}
+   var directory=safe(LibraryCategories.disk(category));Files.createDirectories(directory);Path destination=unique(directory.resolve(CategoryClassifier.snake(title)+suffix(source)));String target=relative(destination);if(!source.equals(destination))relocateFile(source,destination,"manual_register",sha256(source),cache,true);saveCache(cache);BookGrouper.refresh(lib);lib.refreshSearchIndex();new HtmlCatalog(lib).export();return target;
   }
  });}
  private List<Path> paths()throws Exception{var result=new ArrayList<Path>();Files.walkFileTree(lib.root,documentVisitor(result));var excluded=new HashSet<String>();try(var c=lib.connect();var s=c.createStatement();var rows=s.executeQuery("SELECT path FROM excluded_documents")){while(rows.next())excluded.add(rows.getString(1));}result.removeIf(p->excluded.contains(relative(p)));result.sort(Comparator.naturalOrder());return result;}
