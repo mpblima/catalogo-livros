@@ -8,7 +8,7 @@ import java.awt.geom.*;
 
 /** Paleta e componentes visuais compartilhados pela janela e pela abertura. */
 final class UiTheme {
- static final Color BACKGROUND=new Color(250,236,231),SURFACE=new Color(252,247,243),RAISED=new Color(250,236,231),LINE=new Color(245,196,179),TEXT=new Color(74,27,12),MUTED=new Color(128,98,83),ACCENT=new Color(128,81,63),SELECTED=new Color(250,236,231);
+ static final Color BACKGROUND=new Color(250,236,231),SURFACE=new Color(252,247,243),RAISED=new Color(250,236,231),LINE=new Color(245,196,179),TEXT=new Color(74,27,12),MUTED=new Color(128,98,83),ACCENT=new Color(128,81,63),SELECTED=new Color(245,196,179);
  static void install(){
   FlatLightLaf.setup();
   UIManager.put("defaultFont",new Font("Arial",Font.PLAIN,14));
