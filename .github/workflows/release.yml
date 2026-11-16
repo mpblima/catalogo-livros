@@ -90,7 +90,7 @@ jobs:
         if: matrix.platform == 'macos'
         run: ./packaging/gerar_icns.sh
       - name: Compilar e testar
-        run: mvn -B "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest,LibrarySettingsTest,LibraryServerTest,CloudSyncTest" verify
+        run: mvn -B -Drevision="2.0.${{ github.run_number }}" "-Dtest=BibliotecaTest,SearchIndexTest,PhysicalBooksTest,BookEditorTest,BookLookupTest,CoverQueueTest,LibraryCategoriesTest,HtmlCatalogConfigTest,LibrarySettingsTest,LibraryServerTest,CloudSyncTest" verify
       - name: Validar OCR incluído na plataforma
         run: java -jar target/catalogo-livros.jar --verify-ocr
       - name: Validar SQLite na plataforma
@@ -103,7 +103,7 @@ jobs:
           $options = @('--type', '${{ matrix.type }}', '--name', 'CatalogoLivros', '--app-version', '2.0.${{ github.run_number }}', '--input', 'target/package-input', '--main-jar', 'catalogo-livros.jar', '--dest', 'dist', '--java-options', '-Dfile.encoding=UTF-8', '--add-launcher', 'CatalogoServer=packaging/server-launcher.properties')
           if ($IsWindows) {
             $env:PATH += ";${env:WIX}bin"
-            $options += @('--icon', 'packaging/catalogo.ico', '--win-menu', '--win-shortcut', '--win-dir-chooser', '--win-per-user-install')
+            $options += @('--icon', 'packaging/catalogo.ico', '--win-menu', '--win-shortcut', '--win-dir-chooser', '--win-per-user-install', '--win-upgrade-uuid', 'F5C7A2B1-8D11-4F3A-9E6C-2A7B4D809135')
           } else {
             $options += @('--icon', 'target/catalogo.icns')
           }
@@ -127,6 +127,11 @@ jobs:
           pattern: installers-*
           merge-multiple: true
           path: dist
+      - name: Gerar feed de atualização assinado
+        env:
+          VERSION: 2.0.${{ github.run_number }}
+          CATALOGO_UPDATER_PRIVATE_KEY: ${{ secrets.CATALOGO_UPDATER_PRIVATE_KEY }}
+        run: node packaging/gerar_feed_atualizacao.mjs
       - name: Publicar release
         if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         env:

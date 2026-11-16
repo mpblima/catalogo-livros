@@ -12,7 +12,7 @@ mkdir -p "$work/input" "$work/image" "$work/payload" dist
 cp target/catalogo-livros.jar "$work/input/"
 "$jpackage_bin" --type app-image --name catalogo --app-version "$version" \
  --input "$work/input" --main-jar catalogo-livros.jar --dest "$work/image" \
- --icon packaging/catalogo.png --java-options '-Dfile.encoding=UTF-8' --description 'Biblioteca pessoal Java/Swing'
+ --icon packaging/catalogo.png --java-options '-Dfile.encoding=UTF-8' --java-options '-Dcatalogo.app-dir=$APPDIR/../..' --description 'Biblioteca pessoal Java/Swing'
 cp -a "$work/image/catalogo" "$work/payload/"
 cp packaging/instalar.sh packaging/catalogo.svg packaging/catalogo.png "$work/payload/"
 tar -czf "$work/payload.tar.gz" -C "$work/payload" .
